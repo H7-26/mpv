@@ -32,7 +32,7 @@ jobs:
       with:
         target_sync_branch: master
         # REQUIRED 'target_repo_token' exactly like this!
-        target_repo_token: ${{ secrets.wrkflw2 }}
+        target_repo_token: ${{ secrets.wrkflw3 }}
         upstream_sync_branch: master
         upstream_sync_repo: mpv-player/mpv
         upstream_repo_access_token: ${{ secrets.UPSTREAM_REPO_SECRET }}
