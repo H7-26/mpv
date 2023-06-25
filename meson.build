@@ -131,6 +131,7 @@ sources = files(
     'misc/charset_conv.c',
     'misc/dispatch.c',
     'misc/json.c',
+    'misc/language.c',
     'misc/natural_sort.c',
     'misc/node.c',
     'misc/random.c',
@@ -383,7 +384,9 @@ cocoa = dependency('appleframeworks', modules: ['Cocoa', 'IOKit', 'QuartzCore'],
 features += {'cocoa': cocoa.found()}
 if features['cocoa']
     dependencies += cocoa
-    sources += files('osdep/macosx_application.m',
+    sources += files('osdep/apple_utils.c',
+                     'osdep/language-apple.c',
+                     'osdep/macosx_application.m',
                      'osdep/macosx_events.m',
                      'osdep/macosx_menubar.m',
                      'osdep/main-fn-cocoa.c',
@@ -405,7 +408,8 @@ if posix
 endif
 
 if posix and not features['cocoa']
-    sources += files('osdep/main-fn-unix.c')
+    sources += files('osdep/main-fn-unix.c',
+                     'osdep/language-posix.c')
 endif
 
 if darwin
@@ -490,6 +494,7 @@ if features['win32-desktop']
     subprocess_source = files('osdep/subprocess-win.c')
     sources += path_source + subprocess_source + \
                files('input/ipc-win.c',
+                     'osdep/language-win.c',
                      'osdep/main-fn-win.c',
                      'osdep/terminal-win.c',
                      'video/out/w32_common.c',
