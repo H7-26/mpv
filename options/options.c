@@ -1033,9 +1033,7 @@ static const struct MPOpts mp_default_opts = {
                      [STREAM_VIDEO] = -2,
                      [STREAM_SUB] = -2, }, },
     .stream_lang = {
-        NULL, // video
-        NULL, // audio
-        (char**)(const char*[]) {"auto", NULL} // subtitles
+        [STREAM_SUB] = (char *[]){ "auto", NULL },
     },
     .stream_auto_sel = true,
     .subs_with_matching_audio = false,
@@ -1059,7 +1057,7 @@ static const struct MPOpts mp_default_opts = {
 
     .mf_fps = 1.0,
 
-    .display_tags = (char **)(const char*[]){
+    .display_tags = (char *[]){
         "Artist", "Album", "Album_Artist", "Comment", "Composer",
         "Date", "Description", "Genre", "Performer", "Rating",
         "Series", "Title", "Track", "icy-title", "service_name",
@@ -1069,7 +1067,7 @@ static const struct MPOpts mp_default_opts = {
 
     .cuda_device = -1,
 
-    .watch_later_options = (char **)(const char*[]){
+    .watch_later_options = (char *[]){
         "start",
         "osd-level",
         "speed",
