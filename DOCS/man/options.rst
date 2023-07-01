@@ -3085,13 +3085,14 @@ Window
 ``--snap-window``
     (Windows only) Snap the player window to screen edges.
 
-``--drag-and-drop=<auto|replace|append>``
-    (X11 and Wayland only)
+``--drag-and-drop=<no|auto|replace|append>``
+    (X11, Wayland and Windows only)
     Controls the default behavior of drag and drop on platforms that support this.
     ``auto`` will obey what the underlying os/platform gives mpv. Typically, holding
     shift during the drag and drop will append the item to the playlist. Otherwise,
     it will completely replace it. ``replace`` and ``append`` always force replacing
-    and appending to the playlist respectively.
+    and appending to the playlist respectively. ``no`` disables all drag and drop
+    behavior.
 
 ``--ontop``
     Makes the player window stay on top of other windows.
@@ -4317,6 +4318,7 @@ Screenshot
     :jpeg:      JPEG (alias for jpg)
     :webp:      WebP
     :jxl:       JPEG XL
+    :avif:      AVIF
 
 ``--screenshot-tag-colorspace=<yes|no>``
     Tag screenshots with the appropriate colorspace.
@@ -4471,6 +4473,33 @@ Screenshot
 ``--screenshot-jxl-effort=<1-9>``
     Set the JPEG XL compression effort. Higher effort (usually) means better
     compression, but takes more CPU time. The default is 4.
+
+``--screenshot-avif-encoder=<encoder>``
+    Specify the AV1 encoder to be used by libavcodec for encoding avif
+    screenshots.
+
+    Default: ``libaom-av1``
+
+``--screenshot-avif-pixfmt=<format>``
+    Specify the pixel format to the libavcodec encoder.
+
+    Default: ``yuv420p``
+
+``--screenshot-avif-opts=key1=value1,key2=value2,...``
+    Specifies libavcodec options for selected encoder. For more information,
+    consult the FFmpeg documentation.
+
+    Default: ``usage=allintra,crf=32,cpu-used=8,tune=ssim``
+
+    Note: the default is only guaranteed to work with the libaom-av1 encoder.
+    Above options may not be valid and or optimal for other encoders.
+
+    This is a key/value list option. See `List Options`_ for details.
+
+    .. admonition:: Example
+
+        "``--screenshot-avif-opts=crf=32,aq-mode=complexity``"
+            sets the crf to 32 and quantization (aq-mode) to complexity based.
 
 ``--screenshot-sw=<yes|no>``
     Whether to use software rendering for screenshots (default: no).
