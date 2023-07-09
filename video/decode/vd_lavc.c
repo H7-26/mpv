@@ -233,8 +233,8 @@ struct autoprobe_info {
 const struct autoprobe_info hwdec_autoprobe_info[] = {
     {"d3d11va",         HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"dxva2",           HWDEC_FLAG_AUTO},
-    {"dxva2-copy",      HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"d3d11va-copy",    HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
+    {"dxva2-copy",      HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"nvdec",           HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"nvdec-copy",      HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"vaapi",           HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
@@ -1215,11 +1215,11 @@ static int receive_frame(struct mp_filter *vd, struct mp_frame *out_frame)
     if (ret == AVERROR(EAGAIN) && ctx->num_requeue_packets)
         return 0; // force retry, so send_queued_packet() gets called
 
-    if (!ctx->num_delay_queue)
+    if (ctx->num_delay_queue <= ctx->max_delay_queue && ret != AVERROR_EOF)
         return ret;
 
-    if (ctx->num_delay_queue <= ctx->max_delay_queue && ret != AVERROR_EOF)
-        return AVERROR(EAGAIN);
+    if (!ctx->num_delay_queue)
+        return ret;
 
     struct mp_image *res = ctx->delay_queue[0];
     MP_TARRAY_REMOVE_AT(ctx->delay_queue, ctx->num_delay_queue, 0);
