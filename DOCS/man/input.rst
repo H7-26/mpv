@@ -385,7 +385,7 @@ Remember to quote string arguments in input.conf (see `Flat command syntax`_).
     ``async`` flag to make encoding/writing the image file asynchronous. For
     normal standalone commands, this is always asynchronous, and the flag has
     no effect. (This behavior changed with mpv 0.29.0.)
-    
+
     On success, returns a ``mpv_node`` with a ``filename`` field set to the
     saved screenshot location.
 
@@ -2410,6 +2410,12 @@ Property list
     ``video-params/dw``, ``video-params/dh``
         Video size as integers, scaled for correct aspect ratio.
 
+    ``video-params/crop-x``, ``video-params/crop-y``
+        Crop offset of the source video frame.
+
+    ``video-params/crop-w``, ``video-params/crop-h``
+        Video size after cropping.
+
     ``video-params/aspect``
         Display aspect ratio as float.
 
@@ -2662,13 +2668,6 @@ Property list
     active, or if the VO does not report a value, this property is unavailable.
     It may be saner to report an absolute DPI, however, this is the way HiDPI
     support is implemented on most OS APIs. See also ``--hidpi-window-scale``.
-
-``video-aspect`` (RW)
-    Deprecated. This is tied to ``--video-aspect-override``, but always
-    reports the current video aspect if video is active.
-
-    The read and write components of this option can be split up into
-    ``video-params/aspect`` and ``video-aspect-override`` respectively.
 
 ``osd-width``, ``osd-height``
     Last known OSD width (can be 0). This is needed if you want to use the
