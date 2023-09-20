@@ -1574,7 +1574,7 @@ Video
     This works with hwdec, unlike the equivalent 'lavfi-crop'. When offset is
     omitted, the central area will be cropped. Setting the crop to empty one
     ``--video-crop=0x0+0+0`` overrides container crop and disables cropping.
-    Setting the crop to ``--video-crop=0`` disables manual cropping and restores
+    Setting the crop to ``--video-crop=""`` disables manual cropping and restores
     the container crop if it's specified.
 
 ``--video-zoom=<value>``
@@ -6070,7 +6070,7 @@ them.
 ``--deband-threshold=<0..4096>``
     The debanding filter's cut-off threshold. Higher numbers increase the
     debanding strength dramatically but progressively diminish image details.
-    (Default 32)
+    (Default 48)
 
 ``--deband-range=<1..64>``
     The debanding filter's initial radius. The radius increases linearly for
@@ -6083,7 +6083,7 @@ them.
 ``--deband-grain=<0..4096>``
     Add some extra noise to the image. This significantly helps cover up
     remaining quantization artifacts. Higher numbers add more noise. (Default
-    48)
+    32)
 
 ``--corner-rounding=<0..1>``
     If set to a value above 0.0, the output will be rendered with rounded
@@ -6735,7 +6735,7 @@ them.
     come with a small performance penalty. (Only for ``--vo=gpu-next``)
 
 ``--hdr-peak-decay-rate=<0.0..1000.0>``
-    The decay rate used for the HDR peak detection algorithm (default: 100.0).
+    The decay rate used for the HDR peak detection algorithm (default: 20.0).
     This is only relevant when ``--hdr-compute-peak`` is enabled. Higher values
     make the peak decay more slowly, leading to more stable values at the cost
     of more "eye adaptation"-like effects (although this is mitigated somewhat
@@ -6747,7 +6747,7 @@ them.
 
 ``--hdr-scene-threshold-low=<0.0..100.0>``, ``--hdr-scene-threshold-high=<0.0..100.0>``
     The lower and upper thresholds (in dB) for a brightness difference
-    to be considered a scene change (default: 5.5 low, 10.0 high). This is only
+    to be considered a scene change (default: 1.0 low, 3.0 high). This is only
     relevant when ``--hdr-compute-peak`` is enabled. Normally, small
     fluctuations in the frame brightness are compensated for by the peak
     averaging mechanism, but for large jumps in the brightness this can result
