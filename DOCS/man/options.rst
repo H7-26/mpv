@@ -602,7 +602,7 @@ Playback Control
     Tuning:
 
     - Remove all ``--vf``/``--af`` filters you have set. Disable hardware
-      decoding. Disable idiotic nonsense like SPDIF passthrough.
+      decoding. Disable functions like SPDIF passthrough.
 
     - Increasing ``--video-reversal-buffer`` might help if reversal queue
       overflow is reported, which may happen in high bitrate video, or video
@@ -5255,9 +5255,6 @@ them.
         Bilinear hardware texture filtering (fastest, very low quality). This is
         the default when using the ``fast`` profile.
 
-    ``spline36``
-        Mid quality and speed.
-
     ``lanczos``
         Lanczos scaling. Provides good balance between quality and performance.
         This is the default for ``scale``. The number of taps can be controlled
@@ -5285,23 +5282,27 @@ them.
 
     ``mitchell``
         Mitchell-Netravali. The ``B`` and ``C`` parameters can be set with
-        ``--scale-param1`` and ``--scale-param2``. This filter is very good at
-        downscaling. This is the default for ``--dscale``.
+        ``--scale-param1`` and ``--scale-param2``.
+
+    ``hermite``
+        Hermite spline. Similar to ``bicubic`` but with ``B`` set to ``0.0``.
+        This filter has the special property of having a support of radius 1.0,
+        making it very fast in comparison, but prone to blocking. This is the
+        default for ``--dscale``.
 
     ``catmull_rom``
         Catmull-Rom. A Cubic filter in the same vein as ``mitchell``, where
         the ``B`` and ``C`` parameters are ``0.0`` and ``0.5`` respectively.
-        This filter is sharper than ``mitchell``, but it results in mild
-        ringing. Like ``mitchell``, this filter is good at downscaling (see
-        ``--dscale``).
+        This filter is sharper than ``mitchell``, but it results in more
+        ringing.
 
     ``oversample``
         A version of nearest neighbour that (naively) oversamples pixels, so
         that pixels overlapping edges get linearly interpolated instead of
         rounded. This essentially removes the small imperfections and judder
         artifacts caused by nearest-neighbour interpolation, in exchange for
-        adding some blur. This filter is good at temporal interpolation, and
-        also known as "smoothmotion" (see ``--tscale``).
+        adding some blur. This can also be used for frame mixing, where it
+        is commonly known as "smoothmotion" (see ``--tscale``).
 
     ``linear``
         A ``--tscale`` filter.
