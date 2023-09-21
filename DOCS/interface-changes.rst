@@ -87,6 +87,8 @@ Interface changes
     - remove deprecated `--vf-defaults` and `--af-defaults` options
     - `--drm-connector` no longer allows selecting the card number (use `--drm-device`
       instead)
+    - add `--title-bar` option
+    - add `--window-corners` option
  --- mpv 0.36.0 ---
     - add `--target-contrast`
     - Target luminance value is now also applied when ICC profile is used.

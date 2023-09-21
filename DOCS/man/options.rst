@@ -3131,9 +3131,24 @@ Window
     Focus the video window on creation and makes it the front most window. This
     is on by default.
 
+``--window-corners=<default|donotround|round|roundsmall>``
+    (Windows only)
+    Set the preference for window corner rounding.
+
+    :default: Let the system decide whether or not to round window corners
+    :donotround: Never round window corners
+    :round: Round the corners if appropriate
+    :roundsmall: Round the corners if appropriate, with a small radius
+
 ``--border``, ``--no-border``
     Play video with window border and decorations. Since this is on by
     default, use ``--no-border`` to disable the standard window decorations.
+
+``--title-bar``, ``--no-title-bar``
+    (Windows only)
+    Play video with the window title bar. Since this is on by default,
+    use --no-title-bar to hide the title bar. The --no-border option takes
+    precedence.
 
 ``--on-all-workspaces``
     (X11 and macOS only)
@@ -6074,6 +6089,7 @@ them.
     X11/GLX only.
 
 ``--opengl-dwmflush=<no|windowed|yes|auto>``
+	(Windows only)
     Calls ``DwmFlush`` after swapping buffers on Windows (default: auto). It
     also sets ``SwapInterval(0)`` to ignore the OpenGL timing. Values are: no
     (disabled), windowed (only in windowed mode), yes (also in full screen).
@@ -6084,8 +6100,6 @@ them.
     This may help to get more consistent frame intervals, especially with
     high-fps clips - which might also reduce dropped frames. Typically, a value
     of ``windowed`` should be enough, since full screen may bypass the DWM.
-
-    Windows only.
 
 ``--angle-d3d11-feature-level=<11_0|10_1|10_0|9_3>``
     Selects a specific feature level when using the ANGLE backend with D3D11.
@@ -7112,12 +7126,20 @@ Miscellaneous
 
     This is a key/value list option. See `List Options`_ for details.
 
+``--window-affinity=<default|excludefromcmcapture|monitor>``
+    (Windows only)
+	Controls the window affinity behavior of mpv.
+
+    :default: Default Windows behavior
+    :excludefromcapture: mpv's window will be completely excluded from capture by external applications or screen recording software. 
+    :monitor: Blacks out the mpv window
+
 ``--vo-mmcss-profile=<name>``
-    (Windows only.)
+    (Windows only)
     Set the MMCSS profile for the video renderer thread (default: ``Playback``).
 
 ``--priority=<prio>``
-    (Windows only.)
+    (Windows only)
     Set process priority for mpv according to the predefined priorities
     available under Windows.
 

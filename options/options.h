@@ -16,6 +16,7 @@ typedef struct mp_vo_opts {
     int ontop_level;
     bool fullscreen;
     bool border;
+    bool title_bar;
     bool all_workspaces;
     bool window_minimized;
     bool window_maximized;
@@ -63,7 +64,9 @@ typedef struct mp_vo_opts {
     bool force_render;
     bool force_window_position;
 
+    int window_affinity;
     char *mmcss_profile;
+    int window_corners;
 
     double override_display_fps;
     double timing_offset;

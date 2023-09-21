@@ -32,6 +32,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <dwmapi.h>
 #endif
 
 #include "options.h"
@@ -114,6 +115,7 @@ static const m_option_t mp_vo_opt_list[] = {
     {"ontop-level", OPT_CHOICE(ontop_level, {"window", -1}, {"system", -2},
         {"desktop", -3}), M_RANGE(0, INT_MAX)},
     {"border", OPT_BOOL(border)},
+    {"title-bar", OPT_BOOL(title_bar)},
     {"on-all-workspaces", OPT_BOOL(all_workspaces)},
     {"geometry", OPT_GEOMETRY(geometry)},
     {"autofit", OPT_SIZE_BOX(autofit)},
@@ -186,7 +188,19 @@ static const m_option_t mp_vo_opt_list[] = {
         {"photo", 1}, {"video", 2}, {"game", 3})},
 #endif
 #if HAVE_WIN32_DESKTOP
+    {"window-affinity", OPT_CHOICE(window_affinity, {"default", WDA_NONE},
+        {"excludefromcapture", WDA_EXCLUDEFROMCAPTURE}, {"monitor", WDA_MONITOR})},
     {"vo-mmcss-profile", OPT_STRING(mmcss_profile)},
+// For old MinGW-w64 compatibility
+#define DWMWCP_DEFAULT 0
+#define DWMWCP_DONOTROUND 1
+#define DWMWCP_ROUND 2
+#define DWMWCP_ROUNDSMALL 3
+    {"window-corners", OPT_CHOICE(window_corners,
+        {"default", DWMWCP_DEFAULT},
+        {"donotround", DWMWCP_DONOTROUND},
+        {"round", DWMWCP_ROUND},
+        {"roundsmall", DWMWCP_ROUNDSMALL})},
 #endif
 #if HAVE_EGL_ANDROID
     {"android-surface-size", OPT_SIZE_BOX(android_surface_size)},
@@ -214,6 +228,7 @@ const struct m_sub_options vo_sub_opts = {
         .native_fs = true,
         .taskbar_progress = true,
         .border = true,
+        .title_bar = true,
         .appid = "mpv",
         .content_type = -1,
         .WinID = -1,
