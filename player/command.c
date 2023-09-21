@@ -2472,17 +2472,6 @@ static int mp_property_display_fps(void *ctx, struct m_property *prop,
     MPContext *mpctx = ctx;
     double fps = mpctx->video_out ? vo_get_display_fps(mpctx->video_out) : 0;
     switch (action) {
-    case M_PROPERTY_SET: {
-        MP_WARN(mpctx, "Setting the display-fps property is deprecated; set "
-                       "the override-display-fps property instead.\n");
-        struct mpv_node val = {
-            .format = MPV_FORMAT_DOUBLE,
-            .u.double_ = *(double *)arg,
-        };
-        return m_config_set_option_node(mpctx->mconfig,
-            bstr0("override-display-fps"), &val, 0)
-            >= 0 ? M_PROPERTY_OK : M_PROPERTY_ERROR;
-    }
     case M_PROPERTY_GET:
         if (fps <= 0)
             return M_PROPERTY_UNAVAILABLE;
@@ -3048,11 +3037,8 @@ static int mp_property_playlist_pos_x(void *ctx, struct m_property *prop,
     }
     case M_PROPERTY_SET: {
         int pos = *(int *)arg - base;
-        if (pos >= 0 && playlist_entry_to_index(pl, pl->current) == pos) {
-            MP_WARN(mpctx, "Behavior of %s when writing the same value will "
-                    "change (currently restarts, it will stop doing this).\n",
-                    prop->name);
-        }
+        if (pos >= 0 && playlist_entry_to_index(pl, pl->current) == pos)
+            return M_PROPERTY_OK;
         mp_set_playlist_entry(mpctx, playlist_entry_from_index(pl, pos));
         return M_PROPERTY_OK;
     }
@@ -4031,8 +4017,6 @@ static const struct m_property mp_properties_base[] = {
     M_PROPERTY_ALIAS("colormatrix-gamma", "video-params/gamma"),
 
     M_PROPERTY_DEPRECATED_ALIAS("sub-forced-only-cur", "sub-forced-events-only"),
-    M_PROPERTY_DEPRECATED_ALIAS("drop-frame-count", "decoder-frame-drop-count"),
-    M_PROPERTY_DEPRECATED_ALIAS("vo-drop-frame-count", "frame-drop-count"),
 };
 
 // Each entry describes which properties an event (possibly) changes.
@@ -4047,13 +4031,13 @@ static const char *const *const mp_event_property_change[] = {
     E(MPV_EVENT_IDLE, "*"),
     E(MPV_EVENT_TICK, "time-pos", "audio-pts", "stream-pos", "avsync",
       "percent-pos", "time-remaining", "playtime-remaining", "playback-time",
-      "estimated-vf-fps", "drop-frame-count", "vo-drop-frame-count",
-      "total-avsync-change", "audio-speed-correction", "video-speed-correction",
-      "vo-delayed-frame-count", "mistimed-frame-count", "vsync-ratio",
-      "estimated-display-fps", "vsync-jitter", "sub-text", "secondary-sub-text",
-      "audio-bitrate", "video-bitrate", "sub-bitrate", "decoder-frame-drop-count",
-      "frame-drop-count", "video-frame-info", "vf-metadata", "af-metadata",
-      "sub-start", "sub-end", "secondary-sub-start", "secondary-sub-end"),
+      "estimated-vf-fps", "total-avsync-change", "audio-speed-correction",
+      "video-speed-correction", "vo-delayed-frame-count", "mistimed-frame-count",
+      "vsync-ratio", "estimated-display-fps", "vsync-jitter", "sub-text",
+      "secondary-sub-text", "audio-bitrate", "video-bitrate", "sub-bitrate",
+      "decoder-frame-drop-count", "frame-drop-count", "video-frame-info",
+      "vf-metadata", "af-metadata", "sub-start", "sub-end", "secondary-sub-start",
+      "secondary-sub-end"),
     E(MP_EVENT_DURATION_UPDATE, "duration"),
     E(MPV_EVENT_VIDEO_RECONFIG, "video-out-params", "video-params",
       "video-format", "video-codec", "video-bitrate", "dwidth", "dheight",
@@ -7056,9 +7040,6 @@ void mp_option_change_callback(void *ctx, struct m_config_option *co, int flags,
         set_osd_bar_chapters(mpctx, OSD_BAR_SEEK);
         mp_wakeup_core(mpctx);
     }
-
-    if (opt_ptr == &opts->record_file)
-        open_recorder(mpctx, false);
 
     if (opt_ptr == &opts->vf_settings)
         set_filters(mpctx, STREAM_VIDEO, opts->vf_settings);

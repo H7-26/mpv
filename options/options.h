@@ -16,7 +16,6 @@ typedef struct mp_vo_opts {
     int ontop_level;
     bool fullscreen;
     bool border;
-    bool fit_border;
     bool all_workspaces;
     bool window_minimized;
     bool window_maximized;
@@ -202,7 +201,6 @@ typedef struct MPOpts {
 
     bool untimed;
     char *stream_dump;
-    char *record_file;
     bool stop_playback_on_init_failure;
     int loop_times;
     int loop_file;
@@ -301,8 +299,8 @@ typedef struct MPOpts {
     int force_srate;
     double playback_speed;
     bool pitch_correction;
-    struct m_obj_settings *vf_settings, *vf_defs;
-    struct m_obj_settings *af_settings, *af_defs;
+    struct m_obj_settings *vf_settings;
+    struct m_obj_settings *af_settings;
     struct filter_opts *filter_opts;
     struct dec_wrapper_opts *dec_wrapper;
     char **sub_name;
@@ -367,7 +365,6 @@ typedef struct MPOpts {
     struct spirv_opts *spirv_opts;
     struct d3d11_opts *d3d11_opts;
     struct d3d11va_opts *d3d11va_opts;
-    struct cocoa_opts *cocoa_opts;
     struct macos_opts *macos_opts;
     struct drm_opts *drm_opts;
     struct wayland_opts *wayland_opts;
