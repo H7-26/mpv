@@ -284,7 +284,7 @@ void demuxer_feed_caption(struct sh_stream *stream, demux_packet_t *dp);
 
 int demux_read_packet_async(struct sh_stream *sh, struct demux_packet **out_pkt);
 int demux_read_packet_async_until(struct sh_stream *sh, double min_pts,
-                                  struct demux_packet **out_pkt, bool force_eager);
+                                  struct demux_packet **out_pkt);
 bool demux_stream_is_selected(struct sh_stream *stream);
 void demux_set_stream_wakeup_cb(struct sh_stream *sh,
                                 void (*cb)(void *ctx), void *ctx);
@@ -319,9 +319,9 @@ void demux_get_reader_state(struct demuxer *demuxer, struct demux_reader_state *
 void demux_block_reading(struct demuxer *demuxer, bool block);
 
 void demuxer_select_track(struct demuxer *demuxer, struct sh_stream *stream,
-                          double ref_pts, bool selected);
+                          double ref_pts, bool selected, bool paused);
 void demuxer_refresh_track(struct demuxer *demuxer, struct sh_stream *stream,
-                           double ref_pts);
+                           double ref_pts, bool paused);
 
 int demuxer_help(struct mp_log *log, const m_option_t *opt, struct bstr name);
 

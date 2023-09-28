@@ -864,7 +864,8 @@ static void wakeup_ds(struct demux_stream *ds)
 }
 
 static void update_stream_selection_state(struct demux_internal *in,
-                                          struct demux_stream *ds)
+                                          struct demux_stream *ds,
+                                          bool paused)
 {
     ds->eof = false;
     ds->refreshing = false;
@@ -886,8 +887,8 @@ static void update_stream_selection_state(struct demux_internal *in,
     }
 
     // Subtitles are only eagerly read if there are no other eagerly read
-    // streams.
-    if (any_av_streams) {
+    // streams or the player is paused.
+    if (any_av_streams && !paused) {
         for (int n = 0; n < in->num_streams; n++) {
             struct demux_stream *s = in->streams[n]->ds;
 
@@ -1002,7 +1003,7 @@ static void demux_add_sh_stream_locked(struct demux_internal *in,
         sh->ds->queue = in->current_range->streams[sh->ds->index];
     }
 
-    update_stream_selection_state(in, sh->ds);
+    update_stream_selection_state(in, sh->ds, false);
 
     switch (ds->type) {
     case STREAM_AUDIO:
@@ -2767,7 +2768,7 @@ static int dequeue_packet(struct demux_stream *ds, double min_pts,
 // minutes away). In this situation, this function will just return -1.
 int demux_read_packet_async(struct sh_stream *sh, struct demux_packet **out_pkt)
 {
-    return demux_read_packet_async_until(sh, MP_NOPTS_VALUE, out_pkt, false);
+    return demux_read_packet_async_until(sh, MP_NOPTS_VALUE, out_pkt);
 }
 
 // Like demux_read_packet_async(). They are the same for min_pts==MP_NOPTS_VALUE.
@@ -2775,25 +2776,20 @@ int demux_read_packet_async(struct sh_stream *sh, struct demux_packet **out_pkt)
 // subtitles), then return 0 until demuxing has reached min_pts, or the queue
 // overflowed, or EOF was reached, or a packet was read for this stream.
 int demux_read_packet_async_until(struct sh_stream *sh, double min_pts,
-                                  struct demux_packet **out_pkt, bool force_eager)
+                                  struct demux_packet **out_pkt)
 {
     struct demux_stream *ds = sh ? sh->ds : NULL;
     *out_pkt = NULL;
     if (!ds)
         return -1;
-    if (force_eager)
-        ds->eager = true;
     struct demux_internal *in = ds->in;
 
     pthread_mutex_lock(&in->lock);
     int r = -1;
     while (1) {
         r = dequeue_packet(ds, min_pts, out_pkt);
-        if (in->threading || in->blocked || r != 0) {
-            if (force_eager)
-                ds->eager = false;
+        if (in->threading || in->blocked || r != 0)
             break;
-        }
         // Needs to actually read packets until we got a packet or EOF.
         thread_work(in);
     }
@@ -3966,7 +3962,7 @@ static void initiate_refresh_seek(struct demux_internal *in,
 // ref_pts is used only if the stream is enabled. Then it serves as approximate
 // start pts for this stream (in the worst case it is ignored).
 void demuxer_select_track(struct demuxer *demuxer, struct sh_stream *stream,
-                          double ref_pts, bool selected)
+                          double ref_pts, bool selected, bool paused)
 {
     struct demux_internal *in = demuxer->in;
     struct demux_stream *ds = stream->ds;
@@ -3976,7 +3972,7 @@ void demuxer_select_track(struct demuxer *demuxer, struct sh_stream *stream,
     if (ds->selected != selected) {
         MP_VERBOSE(in, "%sselect track %d\n", selected ? "" : "de", stream->index);
         ds->selected = selected;
-        update_stream_selection_state(in, ds);
+        update_stream_selection_state(in, ds, paused);
         in->tracks_switched = true;
         if (ds->selected) {
             if (in->back_demuxing)
@@ -3996,7 +3992,7 @@ void demuxer_select_track(struct demuxer *demuxer, struct sh_stream *stream,
 // Execute a refresh seek on the given stream.
 // ref_pts has the same meaning as with demuxer_select_track()
 void demuxer_refresh_track(struct demuxer *demuxer, struct sh_stream *stream,
-                           double ref_pts)
+                           double ref_pts, bool paused)
 {
     struct demux_internal *in = demuxer->in;
     struct demux_stream *ds = stream->ds;
@@ -4004,7 +4000,7 @@ void demuxer_refresh_track(struct demuxer *demuxer, struct sh_stream *stream,
     ref_pts = MP_ADD_PTS(ref_pts, -in->ts_offset);
     if (ds->selected) {
         MP_VERBOSE(in, "refresh track %d\n", stream->index);
-        update_stream_selection_state(in, ds);
+        update_stream_selection_state(in, ds, paused);
         if (in->back_demuxing)
             ds->back_seek_pos = ref_pts;
         if (!in->after_seek)
