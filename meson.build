@@ -333,6 +333,9 @@ if features['libdl']
     dependencies += libdl
 endif
 
+# C11 atomics are mandatory but linking to the library is not always required.
+dependencies += cc.find_library('atomic', required: false)
+
 cplugins = get_option('cplugins').require(
     win32 or (features['libdl'] and cc.has_link_argument('-rdynamic')),
     error_message: 'cplugins not supported by the os or compiler!',
@@ -399,8 +402,7 @@ endif
 if posix
     path_source = files('osdep/path-unix.c')
     subprocess_source = files('osdep/subprocess-posix.c')
-    sources += path_source + subprocess_source + \
-               files('input/ipc-unix.c',
+    sources += files('input/ipc-unix.c',
                      'osdep/poll_wrapper.c',
                      'osdep/terminal-unix.c',
                      'sub/filter_regex.c')
@@ -413,13 +415,11 @@ endif
 
 if darwin
     path_source = files('osdep/path-darwin.c')
-    sources += path_source + files('osdep/timer-darwin.c')
-
+    timer_source = files('osdep/timer-darwin.c')
 endif
 
 if posix and not darwin
-    sources += files('osdep/path-unix.c',
-                     'osdep/timer-linux.c')
+    timer_source = files('osdep/timer-linux.c')
 endif
 
 features += {'ppoll': cc.has_function('ppoll', args: '-D_GNU_SOURCE',
@@ -471,13 +471,14 @@ uwp = cc.find_library('windowsapp', required: uwp_opt)
 features += {'uwp': uwp.found()}
 if features['uwp']
     dependencies += uwp
-    sources += files('osdep/path-uwp.c')
+    path_source = files('osdep/path-uwp.c')
+    subprocess_source = []
 endif
 
 features += {'win32-executable': win32 and get_option('cplayer')}
 if win32
-    sources += files('osdep/timer-win2.c',
-                     'osdep/w32_keyboard.c',
+    timer_source = files('osdep/timer-win2.c')
+    sources += files('osdep/w32_keyboard.c',
                      'osdep/windows_utils.c')
 endif
 
@@ -494,8 +495,7 @@ if features['win32-desktop']
     dependencies += win32_desktop_libs
     path_source = files('osdep/path-win.c')
     subprocess_source = files('osdep/subprocess-win.c')
-    sources += path_source + subprocess_source + \
-               files('input/ipc-win.c',
+    sources += files('input/ipc-win.c',
                      'osdep/language-win.c',
                      'osdep/main-fn-win.c',
                      'osdep/terminal-win.c',
@@ -506,7 +506,7 @@ endif
 
 if not posix and not features['win32-desktop']
     subprocess_source = files('osdep/subprocess-dummy.c')
-    sources += subprocess_source + files('input/ipc-dummy.c')
+    sources += files('input/ipc-dummy.c')
 endif
 
 features += {'glob-posix': cc.has_function('glob', prefix: '#include <glob.h>')}
@@ -550,6 +550,8 @@ vector = get_option('vector').require(
     error_message: 'the compiler does not support gcc vectors!',
 )
 features += {'vector': vector.allowed()}
+
+sources += path_source + subprocess_source + timer_source
 
 
 # various file generations
@@ -730,13 +732,6 @@ sdl2_gamepad = get_option('sdl2-gamepad').require(
 features += {'sdl2-gamepad': sdl2_gamepad.allowed()}
 if features['sdl2-gamepad']
     sources += files('input/sdl_gamepad.c')
-endif
-
-stdatomic_dep = cc.find_library('atomic', required: false)
-features += {'stdatomic': cc.has_header_symbol('stdatomic.h', 'atomic_int', dependencies: stdatomic_dep,
-                                               required: get_option('stdatomic'))}
-if features['stdatomic']
-    dependencies += stdatomic_dep
 endif
 
 uchardet_opt = get_option('uchardet').require(
