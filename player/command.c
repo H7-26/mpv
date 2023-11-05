@@ -15,7 +15,6 @@
  * License along with mpv.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <pthread.h>
 #include <float.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -41,6 +40,7 @@
 #include "common/stats.h"
 #include "filters/f_decoder_wrapper.h"
 #include "command.h"
+#include "osdep/threads.h"
 #include "osdep/timer.h"
 #include "common/common.h"
 #include "input/input.h"
@@ -2291,6 +2291,11 @@ static int property_imgparams(struct mp_image_params p, int action, void *arg)
             (desc.flags & MP_IMGFLAG_ALPHA) ? MP_ALPHA_STRAIGHT : MP_ALPHA_AUTO;
     }
 
+    const struct pl_hdr_metadata *hdr = &p.color.hdr;
+    bool has_cie_y     = pl_hdr_metadata_contains(hdr, PL_HDR_METADATA_CIE_Y);
+    bool has_hdr10     = pl_hdr_metadata_contains(hdr, PL_HDR_METADATA_HDR10);
+    bool has_hdr10plus = pl_hdr_metadata_contains(hdr, PL_HDR_METADATA_HDR10PLUS);
+
     bool has_crop = mp_rect_w(p.crop) > 0 && mp_rect_h(p.crop) > 0;
     const char *aspect_name = get_aspect_ratio_name(d_w / (double)d_h);
     struct m_sub_property props[] = {
@@ -2318,7 +2323,7 @@ static int property_imgparams(struct mp_image_params p, int action, void *arg)
             SUB_PROP_STR(m_opt_choice_str(mp_csp_prim_names, p.color.primaries))},
         {"gamma",
             SUB_PROP_STR(m_opt_choice_str(mp_csp_trc_names, p.color.gamma))},
-        {"sig-peak", SUB_PROP_FLOAT(p.color.sig_peak)},
+        {"sig-peak", SUB_PROP_FLOAT(p.color.hdr.max_luma * MP_REF_WHITE)},
         {"light",
             SUB_PROP_STR(m_opt_choice_str(mp_csp_light_names, p.color.light))},
         {"chroma-location",
@@ -2330,6 +2335,16 @@ static int property_imgparams(struct mp_image_params p, int action, void *arg)
             SUB_PROP_STR(m_opt_choice_str(mp_alpha_names, p.alpha)),
             // avoid using "auto" for "no", so just make it unavailable
             .unavailable = p.alpha == MP_ALPHA_AUTO},
+        {"min-luma",    SUB_PROP_FLOAT(hdr->min_luma),     .unavailable = !has_hdr10},
+        {"max-luma",    SUB_PROP_FLOAT(hdr->max_luma),     .unavailable = !has_hdr10},
+        {"max-cll",     SUB_PROP_FLOAT(hdr->max_cll),      .unavailable = !has_hdr10},
+        {"max-fall",    SUB_PROP_FLOAT(hdr->max_fall),     .unavailable = !has_hdr10},
+        {"scene-max-r", SUB_PROP_FLOAT(hdr->scene_max[0]), .unavailable = !has_hdr10plus},
+        {"scene-max-g", SUB_PROP_FLOAT(hdr->scene_max[1]), .unavailable = !has_hdr10plus},
+        {"scene-max-b", SUB_PROP_FLOAT(hdr->scene_max[2]), .unavailable = !has_hdr10plus},
+        {"scene-avg",   SUB_PROP_FLOAT(hdr->scene_avg),    .unavailable = !has_hdr10plus},
+        {"max-pq-y",    SUB_PROP_FLOAT(hdr->max_pq_y),     .unavailable = !has_cie_y},
+        {"avg-pq-y",    SUB_PROP_FLOAT(hdr->avg_pq_y),     .unavailable = !has_cie_y},
         {0}
     };
 
@@ -2360,7 +2375,13 @@ static int mp_property_vo_imgparams(void *ctx, struct m_property *prop,
     if (valid != M_PROPERTY_VALID)
         return valid;
 
-    return property_imgparams(get_video_out_params(ctx), action, arg);
+    struct mp_image_params p = get_video_out_params(ctx);
+
+    MPContext *mpctx = ctx;
+    if (mpctx->video_out)
+        vo_control(mpctx->video_out, VOCTRL_HDR_METADATA, &p.color.hdr);
+
+    return property_imgparams(p, action, arg);
 }
 
 static int mp_property_dec_imgparams(void *ctx, struct m_property *prop,
@@ -2693,44 +2714,6 @@ static int mp_property_vo_passes(void *ctx, struct m_property *prop,
 
     talloc_free(data);
     return M_PROPERTY_OK;
-}
-
-static int mp_property_hdr_metadata(void *ctx, struct m_property *prop,
-                                    int action, void *arg)
-{
-    MPContext *mpctx = ctx;
-    if (!mpctx->video_out)
-        return M_PROPERTY_UNAVAILABLE;
-
-    int valid = m_property_read_sub_validate(ctx, prop, action, arg);
-    if (valid != M_PROPERTY_VALID)
-        return valid;
-
-    struct mp_hdr_metadata data;
-    if (vo_control(mpctx->video_out, VOCTRL_HDR_METADATA, &data) != VO_TRUE)
-        return M_PROPERTY_UNAVAILABLE;
-
-    bool has_hdr10 = data.max_luma;
-    bool has_hdr10plus = data.scene_avg && (data.scene_max[0] ||
-                                            data.scene_max[1] ||
-                                            data.scene_max[2]);
-    bool has_cie_y = data.max_pq_y && data.avg_pq_y;
-
-    struct m_sub_property props[] = {
-        {"min-luma",    SUB_PROP_FLOAT(data.min_luma),     .unavailable = !has_hdr10},
-        {"max-luma",    SUB_PROP_FLOAT(data.max_luma),     .unavailable = !has_hdr10},
-        {"max-cll",     SUB_PROP_FLOAT(data.max_cll),      .unavailable = !has_hdr10},
-        {"max-fall",    SUB_PROP_FLOAT(data.max_fall),     .unavailable = !has_hdr10},
-        {"scene-max-r", SUB_PROP_FLOAT(data.scene_max[0]), .unavailable = !has_hdr10plus},
-        {"scene-max-g", SUB_PROP_FLOAT(data.scene_max[1]), .unavailable = !has_hdr10plus},
-        {"scene-max-b", SUB_PROP_FLOAT(data.scene_max[2]), .unavailable = !has_hdr10plus},
-        {"scene-avg",   SUB_PROP_FLOAT(data.scene_avg),    .unavailable = !has_hdr10plus},
-        {"max-pq-y",    SUB_PROP_FLOAT(data.max_pq_y),     .unavailable = !has_cie_y},
-        {"avg-pq-y",    SUB_PROP_FLOAT(data.avg_pq_y),     .unavailable = !has_cie_y},
-        {0}
-    };
-
-    return m_property_read_sub(props, action, arg);
 }
 
 static int mp_property_perf_info(void *ctx, struct m_property *p, int action,
@@ -3944,7 +3927,6 @@ static const struct m_property mp_properties_base[] = {
     {"current-window-scale", mp_property_current_window_scale},
     {"vo-configured", mp_property_vo_configured},
     {"vo-passes", mp_property_vo_passes},
-    {"hdr-metadata", mp_property_hdr_metadata},
     {"perf-info", mp_property_perf_info},
     {"current-vo", mp_property_vo},
     {"container-fps", mp_property_fps},
@@ -4069,7 +4051,7 @@ static const char *const *const mp_event_property_change[] = {
       "secondary-sub-text", "audio-bitrate", "video-bitrate", "sub-bitrate",
       "decoder-frame-drop-count", "frame-drop-count", "video-frame-info",
       "vf-metadata", "af-metadata", "sub-start", "sub-end", "secondary-sub-start",
-      "secondary-sub-end"),
+      "secondary-sub-end", "video-out-params", "video-dec-params", "video-params"),
     E(MP_EVENT_DURATION_UPDATE, "duration"),
     E(MPV_EVENT_VIDEO_RECONFIG, "video-out-params", "video-params",
       "video-format", "video-codec", "video-bitrate", "dwidth", "dheight",
@@ -4847,7 +4829,7 @@ struct cmd_list_ctx {
     struct mp_cmd_ctx *parent;
 
     bool current_valid;
-    pthread_t current;
+    mp_thread_id current_tid;
     bool completed_recursive;
 
     // list of sub commands yet to run
@@ -4861,7 +4843,7 @@ static void on_cmd_list_sub_completion(struct mp_cmd_ctx *cmd)
 {
     struct cmd_list_ctx *list = cmd->on_completion_priv;
 
-    if (list->current_valid && pthread_equal(list->current, pthread_self())) {
+    if (list->current_valid && mp_thread_id_equal(list->current_tid, mp_thread_current_id())) {
         list->completed_recursive = true;
     } else {
         continue_cmd_list(list);
@@ -4884,7 +4866,7 @@ static void continue_cmd_list(struct cmd_list_ctx *list)
 
             list->completed_recursive = false;
             list->current_valid = true;
-            list->current = pthread_self();
+            list->current_tid = mp_thread_current_id();
 
             run_command(list->mpctx, sub, NULL, on_cmd_list_sub_completion, list);
 
@@ -5882,10 +5864,10 @@ static void cmd_subprocess(void *p)
     fdctx[1].capture = cmd->args[3].v.b;
     fdctx[2].capture = cmd->args[4].v.b;
 
-    pthread_mutex_lock(&mpctx->abort_lock);
+    mp_mutex_lock(&mpctx->abort_lock);
     cmd->abort->coupled_to_playback = playback_only;
     mp_abort_recheck_locked(mpctx, cmd->abort);
-    pthread_mutex_unlock(&mpctx->abort_lock);
+    mp_mutex_unlock(&mpctx->abort_lock);
 
     mp_core_unlock(mpctx);
 
