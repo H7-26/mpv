@@ -1159,7 +1159,7 @@ static void feedback_presented(void *data, struct wp_presentation_feedback *fbac
     int64_t sec = (uint64_t) tv_sec_lo + ((uint64_t) tv_sec_hi << 32);
     int64_t ust = MP_TIME_S_TO_NS(sec) + (uint64_t) tv_nsec;
     int64_t msc = (uint64_t) seq_lo + ((uint64_t) seq_hi << 32);
-    present_update_sync_values(wl->present, ust, msc);
+    present_sync_update_values(wl->present, ust, msc);
 }
 
 static void feedback_discarded(void *data, struct wp_presentation_feedback *fback)
@@ -2282,7 +2282,7 @@ bool vo_wayland_init(struct vo *vo)
         wl->fback_pool->len = 8; // max swapchain depth allowed
         wl->fback_pool->fback = talloc_zero_array(wl->fback_pool, struct wp_presentation_feedback *,
                                                   wl->fback_pool->len);
-        wl->present = talloc_zero(wl, struct mp_present);
+        wl->present = mp_present_initialize(wl, 8); // max swapchain depth allowed
     } else {
         MP_VERBOSE(wl, "Compositor doesn't support the %s protocol!\n",
                    wp_presentation_interface.name);
@@ -2560,8 +2560,8 @@ void vo_wayland_wait_frame(struct vo_wayland_state *wl)
      * 3. refresh rate of the output reported by the compositor
      * 4. make up crap if vblank_time is still <= 0 (better than nothing) */
 
-    if (wl->use_present)
-        vblank_time = wl->present->vsync_duration;
+    if (wl->use_present && wl->present->head)
+        vblank_time = wl->present->head->vsync_duration;
 
     if (vblank_time <= 0 && wl->refresh_interval > 0)
         vblank_time = wl->refresh_interval;
