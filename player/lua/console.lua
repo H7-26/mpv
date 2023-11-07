@@ -166,29 +166,40 @@ function format_table(list, width_max, rows_max)
     end
 
     -- use as many columns as possible
-    for rows = 1, list_size do
-        local columns = math.ceil(list_size / rows)
-        column_widths = {}
-        width_total = 0
+    for columns = 2, list_size do
+        local rows_lower_bound = math.min(rows_max, math.ceil(list_size / columns))
+        local rows_upper_bound = math.min(rows_max, list_size, math.ceil(list_size / (columns - 1) - 1))
+        for rows = rows_upper_bound, rows_lower_bound, -1 do
+            cw = {}
+            width_total = 0
 
-        -- find out width of each column
-        for column = 1, columns do
-            local width = 0
-            for row = 1, rows do
-                local i = row + (column - 1) * rows
-                if i > #list then break end
-                local item_width = list_widths[i]
-                if width < item_width then
-                    width = item_width
+            -- find out width of each column
+            for column = 1, columns do
+                local width = 0
+                for row = 1, rows do
+                    local i = row + (column - 1) * rows
+                    local item_width = list_widths[i]
+                    if not item_width then break end
+                    if width < item_width then
+                        width = item_width
+                    end
+                end
+                cw[column] = width
+                width_total = width_total + width
+                if width_total + (columns - 1) * spaces_min > width_max then
+                    break
                 end
             end
-            column_widths[column] = width
-            width_total = width_total + width
-        end
 
-        if width_total + columns * spaces_min <= width_max then
-            row_count = rows
-            column_count = columns
+            if width_total + (columns - 1) * spaces_min <= width_max then
+                row_count = rows
+                column_count = columns
+                column_widths = cw
+            else
+                break
+            end
+        end
+        if width_total + (columns - 1) * spaces_min > width_max then
             break
         end
     end
@@ -198,8 +209,7 @@ function format_table(list, width_max, rows_max)
     local spacing = column_count > 1 and string.format('%' .. spaces .. 's', ' ') or ''
 
     local rows = {}
-    local rows_truncated = math.min(row_count, rows_max)
-    for row = 1, rows_truncated do
+    for row = 1, row_count do
         local columns = {}
         for column = 1, column_count do
             local i = row + (column - 1) * row_count
@@ -209,9 +219,9 @@ function format_table(list, width_max, rows_max)
             columns[column] = string.format(format_string, list[i])
         end
         -- first row is at the bottom
-        rows[rows_truncated - row + 1] = table.concat(columns, spacing)
+        rows[row_count - row + 1] = table.concat(columns, spacing)
     end
-    return table.concat(rows, '\n'), rows_truncated
+    return table.concat(rows, '\n'), row_count
 end
 
 local function print_to_terminal()
@@ -756,7 +766,7 @@ end
 --           match.
 function build_completers()
     local completers = {
-        { pattern = '^%s*()[%w_-]+$', list = command_list_and_help, append = ' ' },
+        { pattern = '^%s*()[%w_-]*$', list = command_list_and_help, append = ' ' },
         { pattern = '^%s*help%s+()[%w_-]*$', list = command_list },
         { pattern = '^%s*set%s+"?([%w_-]+)"?%s+()%S*$', list = choice_list },
         { pattern = '^%s*set%s+"?([%w_-]+)"?%s+"()%S*$', list = choice_list, append = '"' },
@@ -770,17 +780,17 @@ function build_completers()
         { pattern = '^%s*change[-_]list%s+"?([%w_-]+)"?%s+"()%a*$', list = list_option_verb_list, append = '" ' },
         { pattern = '^%s*([av]f)%s+()%a*$', list = list_option_verb_list, append = ' ' },
         { pattern = '^%s*([av]f)%s+"()%a*$', list = list_option_verb_list, append = '" ' },
-        { pattern = '${=?()[%w_/-]+$', list = property_list, append = '}' },
+        { pattern = '${=?()[%w_/-]*$', list = property_list, append = '}' },
     }
 
     for _, command in pairs({'set', 'add', 'cycle', 'cycle[-_]values', 'multiply'}) do
         completers[#completers + 1] = {
-            pattern = '^%s*' .. command .. '%s+()[%w_/-]+$',
+            pattern = '^%s*' .. command .. '%s+()[%w_/-]*$',
             list = property_list,
             append = ' ',
         }
         completers[#completers + 1] = {
-            pattern = '^%s*' .. command .. '%s+"()[%w_/-]+$',
+            pattern = '^%s*' .. command .. '%s+"()[%w_/-]*$',
             list = property_list,
             append = '" ',
         }
