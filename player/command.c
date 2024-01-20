@@ -1781,8 +1781,7 @@ static int mp_property_audio_devices(void *ctx, struct m_property *prop,
 static int mp_property_ao(void *ctx, struct m_property *p, int action, void *arg)
 {
     MPContext *mpctx = ctx;
-    return m_property_strdup_ro(action, arg,
-                                    mpctx->ao ? ao_get_name(mpctx->ao) : NULL);
+    return m_property_strdup_ro(action, arg, mpctx->ao ? ao_get_name(mpctx->ao) : NULL);
 }
 
 /// Audio delay (RW)
@@ -2762,8 +2761,15 @@ static int mp_property_perf_info(void *ctx, struct m_property *p, int action,
 static int mp_property_vo(void *ctx, struct m_property *p, int action, void *arg)
 {
     MPContext *mpctx = ctx;
-    return m_property_strdup_ro(action, arg,
-                    mpctx->video_out ? mpctx->video_out->driver->name : NULL);
+    return m_property_strdup_ro(action, arg, mpctx->video_out ?
+                                mpctx->video_out->driver->name : NULL);
+}
+
+static int mp_property_gpu_context(void *ctx, struct m_property *p, int action, void *arg)
+{
+    MPContext *mpctx = ctx;
+    return m_property_strdup_ro(action, arg, mpctx->video_out ?
+                                mpctx->video_out->context_name : NULL);
 }
 
 static int mp_property_osd_dim(void *ctx, struct m_property *prop,
@@ -3923,6 +3929,7 @@ static const struct m_property mp_properties_base[] = {
     {"vo-passes", mp_property_vo_passes},
     {"perf-info", mp_property_perf_info},
     {"current-vo", mp_property_vo},
+    {"current-gpu-context", mp_property_gpu_context},
     {"container-fps", mp_property_fps},
     {"estimated-vf-fps", mp_property_vf_fps},
     {"video-aspect-override", mp_property_video_aspect_override},
@@ -7006,6 +7013,8 @@ void mp_option_change_callback(void *ctx, struct m_config_option *co, int flags,
                                       (void *)(uintptr_t)flags);
                 if (ret == CONTROL_OK && flags & (UPDATE_SUB_FILT | UPDATE_SUB_HARD))
                     sub_redecode_cached_packets(sub);
+                if (track->selected)
+                    reselect_demux_stream(mpctx, track, true);
             }
         }
         osd_changed(mpctx->osd);
