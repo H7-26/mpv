@@ -1667,7 +1667,7 @@ Video
 ``--deinterlace=<yes|no>``
     Enable or disable interlacing (default: no).
     Interlaced video shows ugly comb-like artifacts, which are visible on
-    fast movement. Enabling this typically inserts the yadif video filter in
+    fast movement. Enabling this typically inserts the bwdif video filter in
     order to deinterlace the video, or lets the video output apply deinterlacing
     if supported.
 
@@ -2319,6 +2319,13 @@ Subtitles
 ``--sub-demuxer=<[+]name>``
     Force subtitle demuxer type for ``--sub-file``. Give the demuxer name as
     printed by ``--sub-demuxer=help``.
+
+``--sub-lavc-o=<key>=<value>[,<key>=<value>[,...]]``
+    Pass AVOptions to libavcodec decoder. Note, a patch to make the o=
+    unneeded and pass all unknown options through the AVOption system is
+    welcome. A full list of AVOptions can be found in the FFmpeg manual.
+
+    This is a key/value list option. See `List Options`_ for details.
 
 ``--sub-delay=<sec>``
     Delays primary subtitles by ``<sec>`` seconds. Can be negative.
