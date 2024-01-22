@@ -2307,11 +2307,11 @@ static int property_imgparams(const struct mp_image_params *p, int action, void 
     for (int i = 0; i < desc.num_planes; i++)
         bpp += desc.bpp[i] >> (desc.xs[i] + desc.ys[i]);
 
-    enum mp_alpha_type alpha = p->alpha;
-    // Alpha type is not supported by FFmpeg, so MP_ALPHA_AUTO may mean alpha
+    enum pl_alpha_mode alpha = p->repr.alpha;
+    // Alpha type is not supported by FFmpeg, so PL_ALPHA_UNKNOWN may mean alpha
     // is of an unknown type, or simply not present. Normalize to AUTO=no alpha.
-    if (!!(desc.flags & MP_IMGFLAG_ALPHA) != (alpha != MP_ALPHA_AUTO))
-        alpha = (desc.flags & MP_IMGFLAG_ALPHA) ? MP_ALPHA_STRAIGHT : MP_ALPHA_AUTO;
+    if (!!(desc.flags & MP_IMGFLAG_ALPHA) != (alpha != PL_ALPHA_UNKNOWN))
+        alpha = (desc.flags & MP_IMGFLAG_ALPHA) ? PL_ALPHA_INDEPENDENT : PL_ALPHA_UNKNOWN;
 
     const struct pl_hdr_metadata *hdr = &p->color.hdr;
     bool has_cie_y     = pl_hdr_metadata_contains(hdr, PL_HDR_METADATA_CIE_Y);
@@ -2341,25 +2341,25 @@ static int property_imgparams(const struct mp_image_params *p, int action, void 
         {"sar",             SUB_PROP_FLOAT(p->w / (double)p->h)},
         {"sar-name",        SUB_PROP_STR(sar_name), .unavailable = !sar_name},
         {"colormatrix",
-            SUB_PROP_STR(m_opt_choice_str(mp_csp_names, p->color.space))},
+            SUB_PROP_STR(m_opt_choice_str(pl_csp_names, p->repr.sys))},
         {"colorlevels",
-            SUB_PROP_STR(m_opt_choice_str(mp_csp_levels_names, p->color.levels))},
+            SUB_PROP_STR(m_opt_choice_str(pl_csp_levels_names, p->repr.levels))},
         {"primaries",
-            SUB_PROP_STR(m_opt_choice_str(mp_csp_prim_names, p->color.primaries))},
+            SUB_PROP_STR(m_opt_choice_str(pl_csp_prim_names, p->color.primaries))},
         {"gamma",
-            SUB_PROP_STR(m_opt_choice_str(mp_csp_trc_names, p->color.gamma))},
+            SUB_PROP_STR(m_opt_choice_str(pl_csp_trc_names, p->color.transfer))},
         {"sig-peak", SUB_PROP_FLOAT(p->color.hdr.max_luma / MP_REF_WHITE)},
         {"light",
-            SUB_PROP_STR(m_opt_choice_str(mp_csp_light_names, p->color.light))},
+            SUB_PROP_STR(m_opt_choice_str(mp_csp_light_names, p->light))},
         {"chroma-location",
-            SUB_PROP_STR(m_opt_choice_str(mp_chroma_names, p->chroma_location))},
+            SUB_PROP_STR(m_opt_choice_str(pl_chroma_names, p->chroma_location))},
         {"stereo-in",
             SUB_PROP_STR(m_opt_choice_str(mp_stereo3d_names, p->stereo3d))},
         {"rotate",          SUB_PROP_INT(p->rotate)},
         {"alpha",
-            SUB_PROP_STR(m_opt_choice_str(mp_alpha_names, alpha)),
+            SUB_PROP_STR(m_opt_choice_str(pl_alpha_names, alpha)),
             // avoid using "auto" for "no", so just make it unavailable
-            .unavailable = alpha == MP_ALPHA_AUTO},
+            .unavailable = alpha == PL_ALPHA_UNKNOWN},
         {"min-luma",    SUB_PROP_FLOAT(hdr->min_luma),     .unavailable = !has_hdr10},
         {"max-luma",    SUB_PROP_FLOAT(hdr->max_luma),     .unavailable = !has_hdr10},
         {"max-cll",     SUB_PROP_FLOAT(hdr->max_cll),      .unavailable = !has_hdr10},
@@ -7054,7 +7054,7 @@ void mp_option_change_callback(void *ctx, struct m_config_option *co, int flags,
         handle_force_window(mpctx, true);
         reinit_video_chain(mpctx);
         if (track)
-            reselect_demux_stream(mpctx, track, true);
+            queue_seek(mpctx, MPSEEK_RELATIVE, 0.0, MPSEEK_EXACT, 0);
 
         mp_wakeup_core(mpctx);
     }
