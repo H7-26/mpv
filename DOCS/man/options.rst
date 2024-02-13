@@ -2763,9 +2763,21 @@ Subtitles
     of subtitles across seeks, so after a seek libass can't eliminate subtitle
     packets with the same ReadOrder as earlier packets.
 
-``--teletext-page=<1-999>``
+``--teletext-page=<-1-999>``
+    Select a teletext page number to decode.
+
     This works for ``dvb_teletext`` subtitle streams, and if FFmpeg has been
     compiled with support for it.
+
+    Values ``1-999`` are for individual pages. Special value ``0`` (default)
+    matches all subtitle pages. Special value ``-1`` matches all pages.
+
+    Note that page ``100`` is the default start page of actual teletext. It is
+    also the former default value of this option.
+
+    See the ``libzvbi-teletext`` section in FFmpeg documentation for details.
+
+    Default: 0
 
 ``--sub-past-video-end``
     After the last frame of video, if this option is enabled, subtitles will
