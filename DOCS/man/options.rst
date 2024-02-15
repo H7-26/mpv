@@ -2761,7 +2761,9 @@ Subtitles
     Matroska-style ASS subtitle packets. It should be unique, and libass
     uses it for fast elimination of duplicates. This option disables caching
     of subtitles across seeks, so after a seek libass can't eliminate subtitle
-    packets with the same ReadOrder as earlier packets.
+    packets with the same ReadOrder as earlier packets. Note that enabling this
+    option can result in broken subtitle behavior if you are not actually
+    playing one of the aforementioned broken mkv files.
 
 ``--teletext-page=<-1-999>``
     Select a teletext page number to decode.
@@ -4192,6 +4194,20 @@ Input
     to mpv. For instance, on X11 or Wayland, system-wide media keys are not
     implemented. Whether media keys work when the mpv window is focused is
     implementation-defined.
+
+``--input-preprocess-wheel=<yes|no>``
+    Preprocess ``WHEEL_*`` events so that while scrolling on the horizontal
+    or vertical direction, the events aren't generated for another direction
+    even when the two directions are scrolled together (default: yes).
+
+    This preprocessing can be beneficial for preventing accidentally seeking
+    while changing the volume by scrolling on a touchpad with the default
+    keybind. Due to the deadzone mechanism used, disabling the preprocessing
+    allows for diagonal scrolling (such as panning) and potentially reduces
+    input latency.
+
+    Note that disabling the preprocessing does not affect any filtering done
+    by the OS/driver before these events are delivered to mpv, if any.
 
 ``--input-right-alt-gr``, ``--no-input-right-alt-gr``
     (macOS and Windows only)
