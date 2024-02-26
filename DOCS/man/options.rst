@@ -2185,8 +2185,8 @@ Audio
 ``--audio-samplerate=<Hz>``
     Select the output sample rate to be used (of course sound cards have
     limits on this). If the sample frequency selected is different from that
-    of the current media, the lavrresample audio filter will be inserted into
-    the audio filter layer to compensate for the difference.
+    of the current media, the internal swresample audio filter will be inserted
+    into the audio filter layer to compensate for the difference.
 
 ``--gapless-audio=<no|yes|weak>``
     Try to play consecutive audio files with no silence or disruption at the
@@ -2262,7 +2262,7 @@ Audio
     a larger buffer if it pleases. If the device creates a smaller buffer,
     additional audio is buffered in an additional software buffer.
 
-    Making this larger will make soft-volume and other filters react slower,
+    Making this larger may make soft-volume and other filters react slower,
     introduce additional issues on playback speed change, and block the
     player on audio format changes. A smaller buffer might lead to audio
     dropouts.
@@ -4330,7 +4330,7 @@ OSD
     Size of the border of the OSD bar in scaled pixels (see ``--sub-font-size``
     for details).
 
-    Default: 1.2.
+    Default: 0.5.
 
 ``--osd-back-color=<color>``
     See ``--sub-color``. Color used for OSD text background.
@@ -4768,8 +4768,6 @@ Audio Resampler
 This controls the default options of any resampling done by mpv (but not within
 libavfilter, within the system audio API resampler, or any other places).
 
-It also sets the defaults for the ``lavrresample`` audio filter.
-
 ``--audio-resample-filter-size=<length>``
     Length of the filter with respect to the lower sampling rate. (default:
     16)
@@ -4789,9 +4787,6 @@ It also sets the defaults for the ``lavrresample`` audio filter.
     Enable/disable normalization if surround audio is downmixed to stereo
     (default: no). If this is disabled, downmix can cause clipping. If it's
     enabled, the output might be too quiet. It depends on the source audio.
-
-    Technically, this changes the ``normalize`` suboption of the
-    ``lavrresample`` audio filter, which performs the downmixing.
 
     If downmix happens outside of mpv for some reason, or in the decoder
     (decoder downmixing), or in the audio output (system mixer), this has no
@@ -5273,57 +5268,6 @@ DVB
     An example ``input.conf`` could contain:
     ``H cycle dvbin-channel-switch-offset up``, ``K cycle dvbin-channel-switch-offset down``
 
-ALSA audio output options
--------------------------
-
-
-``--alsa-device=<device>``
-    Deprecated, use ``--audio-device`` (requires ``alsa/`` prefix).
-
-``--alsa-resample=yes``
-    Enable ALSA resampling plugin. (This is disabled by default, because
-    some drivers report incorrect audio delay in some cases.)
-
-``--alsa-mixer-device=<device>``
-    Set the mixer device used with ``ao-volume`` (default: ``default``).
-
-``--alsa-mixer-name=<name>``
-    Set the name of the mixer element (default: ``Master``). This is for
-    example ``PCM`` or ``Master``.
-
-``--alsa-mixer-index=<number>``
-    Set the index of the mixer channel (default: 0). Consider the output of
-    "``amixer scontrols``", then the index is the number that follows the
-    name of the element.
-
-``--alsa-non-interleaved``
-    Allow output of non-interleaved formats (if the audio decoder uses
-    this format). Currently disabled by default, because some popular
-    ALSA plugins are utterly broken with non-interleaved formats.
-
-``--alsa-ignore-chmap``
-    Don't read or set the channel map of the ALSA device - only request the
-    required number of channels, and then pass the audio as-is to it. This
-    option most likely should not be used. It can be useful for debugging,
-    or for static setups with a specially engineered ALSA configuration (in
-    this case you should always force the same layout with ``--audio-channels``,
-    or it will work only for files which use the layout implicit to your
-    ALSA device).
-
-``--alsa-buffer-time=<microseconds>``
-    Set the requested buffer time in microseconds. A value of 0 skips requesting
-    anything from the ALSA API. This and the ``--alsa-periods`` option uses the
-    ALSA ``near`` functions to set the requested parameters. If doing so results
-    in an empty configuration set, setting these parameters is skipped.
-
-    Both options control the buffer size. A low buffer size can lead to higher
-    CPU usage and audio dropouts, while a high buffer size can lead to higher
-    latency in volume changes and other filtering.
-
-``--alsa-periods=<number>``
-    Number of periods requested from the ALSA API. See ``--alsa-buffer-time``
-    for further remarks.
-
 
 GPU renderer options
 -----------------------
@@ -5355,8 +5299,8 @@ them.
         (This filter is an alias for ``jinc``-windowed ``jinc``)
 
     ``ewa_lanczossharp``
-        A slightly sharpened version of ewa_lanczos. This is the default when
-        using the ``high-quality`` profile.
+        A slightly sharpened version of ``ewa_lanczos``. This is the default
+        when using the ``high-quality`` profile.
 
     ``ewa_lanczos4sharpest``
         Very sharp scaler, but also slightly slower than ``ewa_lanczossharp``.
@@ -5365,8 +5309,10 @@ them.
         built-in anti-ringing, so no extra action needs to be taken.
 
     ``mitchell``
-        Mitchell-Netravali. The ``B`` and ``C`` parameters can be set with
-        ``--scale-param1`` and ``--scale-param2``.
+        Mitchell-Netravali. Piecewise cubic filter with a support of radius 2.0.
+        Provides a balanced compromise of all scaling artifacts. This filter has
+        both ``B`` and ``C`` set to ``1/3``. The ``B`` and ``C`` parameters can
+        be controlled with ``--scale-param1`` and ``--scale-param2``.
 
     ``hermite``
         Hermite spline. Similar to ``bicubic`` but with ``B`` set to ``0.0``.
@@ -5375,10 +5321,9 @@ them.
         default for ``--dscale``.
 
     ``catmull_rom``
-        Catmull-Rom. A Cubic filter in the same vein as ``mitchell``, where
-        the ``B`` and ``C`` parameters are ``0.0`` and ``0.5`` respectively.
-        This filter is sharper than ``mitchell``, but it results in more
-        ringing.
+        Catmull-Rom spline. Similar to ``mitchell``, but with ``B`` and ``C``
+        set to ``0.0`` and ``0.5`` respectively. This filter is sharper than
+        ``mitchell``, but prone to ringing.
 
     ``oversample``
         A version of nearest neighbour that (naively) oversamples pixels, so
