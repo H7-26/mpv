@@ -1474,10 +1474,6 @@ static void registry_handle_add(void *data, struct wl_registry *reg, uint32_t id
         seat->id   = id;
         seat->seat = wl_registry_bind(reg, id, &wl_seat_interface, ver);
         wl_seat_add_listener(seat->seat, &seat_listener, seat);
-        if (wl->dnd_devman) {
-            seat->dnd_ddev = wl_data_device_manager_get_data_device(wl->dnd_devman, seat->seat);
-            wl_data_device_add_listener(seat->dnd_ddev, &data_device_listener, seat);
-        }
         wl_list_insert(&wl->seat_list, &seat->link);
     }
 
@@ -1549,6 +1545,15 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 /* Static functions */
+static void free_dnd_data(struct vo_wayland_state *wl)
+{
+    // caller should close wl->dnd_fd if appropriate
+
+    wl->dnd_action = -1;
+    TA_FREEP(&wl->dnd_mime_type);
+    wl->dnd_mime_score = 0;
+}
+
 static void check_dnd_fd(struct vo_wayland_state *wl)
 {
     if (wl->dnd_fd == -1)
@@ -1559,35 +1564,44 @@ static void check_dnd_fd(struct vo_wayland_state *wl)
         return;
 
     if (fdp.revents & POLLIN) {
-        size_t data_read = 0;
-        const size_t chunk_size = 1;
+        ssize_t data_read = 0;
+        const size_t chunk_size = 256;
         bstr file_list = {
             .start = talloc_zero_size(NULL, chunk_size),
         };
 
-        while ((data_read = read(wl->dnd_fd, file_list.start + file_list.len, chunk_size)) > 0) {
+        while (1) {
+            data_read = read(wl->dnd_fd, file_list.start + file_list.len, chunk_size);
+            if (data_read == -1 && errno == EINTR)
+                continue;
+            else if (data_read <= 0)
+                break;
             file_list.len += data_read;
             file_list.start = talloc_realloc_size(NULL, file_list.start, file_list.len + chunk_size);
             memset(file_list.start + file_list.len, 0, chunk_size);
         }
 
-        MP_VERBOSE(wl, "Read %zu bytes from the DND fd\n", file_list.len);
+        if (data_read == -1) {
+            MP_VERBOSE(wl, "DND aborted (read error)\n");
+        } else {
+            MP_VERBOSE(wl, "Read %zu bytes from the DND fd\n", file_list.len);
 
-        mp_event_drop_mime_data(wl->vo->input_ctx, wl->dnd_mime_type,
-                                file_list, wl->dnd_action);
+            if (wl->dnd_offer)
+                wl_data_offer_finish(wl->dnd_offer);
+
+            assert(wl->dnd_action >= 0);
+            mp_event_drop_mime_data(wl->vo->input_ctx, wl->dnd_mime_type,
+                                    file_list, wl->dnd_action);
+        }
+
         talloc_free(file_list.start);
-        if (wl->dnd_mime_type)
-            talloc_free(wl->dnd_mime_type);
-
-        if (wl->dnd_action >= 0 && wl->dnd_offer)
-            wl_data_offer_finish(wl->dnd_offer);
-
-        wl->dnd_action = -1;
-        wl->dnd_mime_type = NULL;
-        wl->dnd_mime_score = 0;
+        free_dnd_data(wl);
     }
 
     if (fdp.revents & (POLLIN | POLLERR | POLLHUP)) {
+        if (wl->dnd_action >= 0)
+            MP_VERBOSE(wl, "DND aborted (hang up or error)\n");
+        free_dnd_data(wl);
         close(wl->dnd_fd);
         wl->dnd_fd = -1;
     }
@@ -2472,7 +2486,13 @@ bool vo_wayland_init(struct vo *vo)
     }
 #endif
 
-    if (!wl->dnd_devman) {
+    if (wl->dnd_devman) {
+        struct vo_wayland_seat *seat;
+        wl_list_for_each(seat, &wl->seat_list, link) {
+            seat->dnd_ddev = wl_data_device_manager_get_data_device(wl->dnd_devman, seat->seat);
+            wl_data_device_add_listener(seat->dnd_ddev, &data_device_listener, seat);
+        }
+    } else {
         MP_VERBOSE(wl, "Compositor doesn't support the %s (ver. 3) protocol!\n",
                    wl_data_device_manager_interface.name);
     }
@@ -2592,6 +2612,10 @@ void vo_wayland_uninit(struct vo *vo)
     struct vo_wayland_state *wl = vo->wl;
     if (!wl)
         return;
+
+    if (wl->dnd_fd != -1)
+        close(wl->dnd_fd);
+    free_dnd_data(wl);
 
     mp_input_put_key(wl->vo->input_ctx, MP_INPUT_RELEASE_ALL);
 
