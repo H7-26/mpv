@@ -494,7 +494,11 @@ static bool hwdec_reconfig(struct priv *p, struct ra_hwdec *hwdec,
                            const struct mp_image_params *par)
 {
     if (p->hwdec_mapper) {
-        if (mp_image_params_equal(par, &p->hwdec_mapper->src_params)) {
+        if (mp_image_params_static_equal(par, &p->hwdec_mapper->src_params)) {
+            p->hwdec_mapper->src_params.repr.dovi = par->repr.dovi;
+            p->hwdec_mapper->dst_params.repr.dovi = par->repr.dovi;
+            p->hwdec_mapper->src_params.color.hdr = par->color.hdr;
+            p->hwdec_mapper->dst_params.color.hdr = par->color.hdr;
             return p->hwdec_mapper;
         } else {
             ra_hwdec_mapper_free(&p->hwdec_mapper);
@@ -700,9 +704,6 @@ static bool map_frame(pl_gpu gpu, pl_tex *tex, const struct pl_source_frame *src
 
     // Update chroma location, must be done after initializing planes
     pl_frame_set_chroma_location(frame, par->chroma_location);
-
-    // Set the frame DOVI metadata
-    mp_map_dovi_metadata_to_pl(mpi, frame);
 
     if (mpi->film_grain)
         pl_film_grain_from_av(&frame->film_grain, (AVFilmGrainParams *) mpi->film_grain->data);
