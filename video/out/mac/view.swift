@@ -78,30 +78,24 @@ class View: NSView, CALayerDelegate {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pb = sender.draggingPasteboard
         guard let types = pb.types else { return false }
+        var files: [String] = []
 
         if types.contains(.fileURL) || types.contains(.URL) {
-            if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL] {
-                let files = urls.map { $0.absoluteString }
-                input?.open(files: files)
-                return true
-            }
+             guard let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL] else { return false }
+             files = urls.map { $0.absoluteString }
         } else if types.contains(.string) {
             guard let str = pb.string(forType: .string) else { return false }
-            var filesArray: [String] = []
-
-            for val in str.components(separatedBy: "\n") {
-                let url = val.trimmingCharacters(in: .whitespacesAndNewlines)
+            files = str.components(separatedBy: "\n").compactMap {
+                let url = $0.trimmingCharacters(in: .whitespacesAndNewlines)
                 let path = (url as NSString).expandingTildeInPath
-                if isURL(url) {
-                    filesArray.append(url)
-                } else if path.starts(with: "/") {
-                    filesArray.append(path)
-                }
+                if isURL(url) { return url }
+                if path.starts(with: "/") { return path }
+                return nil
             }
-            input?.open(files: filesArray)
-            return true
         }
-        return false
+        if files.isEmpty { return false }
+        input?.open(files: files)
+        return true
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -132,53 +126,43 @@ class View: NSView, CALayerDelegate {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseMovement(event)
-        }
+        signalMouseMovement(event)
         common.titleBar?.show()
     }
 
     override func mouseDragged(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseMovement(event)
-        }
+        signalMouseMovement(event)
     }
 
     override func mouseDown(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseDown(event)
-        }
+        hasMouseDown = true
+        input?.processMouse(event: event)
     }
 
     override func mouseUp(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseUp(event)
-        }
+        hasMouseDown = false
         common.window?.isMoving = false
+        input?.processMouse(event: event)
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseDown(event)
-        }
+        hasMouseDown = true
+        input?.processMouse(event: event)
     }
 
     override func rightMouseUp(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseUp(event)
-        }
+        hasMouseDown = false
+        input?.processMouse(event: event)
     }
 
     override func otherMouseDown(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseDown(event)
-        }
+        hasMouseDown = true
+        input?.processMouse(event: event)
     }
 
     override func otherMouseUp(with event: NSEvent) {
-        if input?.mouseEnabled() ?? true {
-            signalMouseUp(event)
-        }
+        hasMouseDown = false
+        input?.processMouse(event: event)
     }
 
     override func magnify(with event: NSEvent) {
@@ -186,23 +170,6 @@ class View: NSView, CALayerDelegate {
             common.windowDidEndLiveResize() : common.windowWillStartLiveResize()
 
         common.window?.addWindowScale(Double(event.magnification))
-    }
-
-    func signalMouseDown(_ event: NSEvent) {
-        signalMouseEvent(event, MP_KEY_STATE_DOWN)
-        if event.clickCount > 1 {
-            signalMouseEvent(event, MP_KEY_STATE_UP)
-        }
-    }
-
-    func signalMouseUp(_ event: NSEvent) {
-        signalMouseEvent(event, MP_KEY_STATE_UP)
-    }
-
-    func signalMouseEvent(_ event: NSEvent, _ state: UInt32) {
-        hasMouseDown = state == MP_KEY_STATE_DOWN
-        let mpkey = getMpvButton(event)
-        input?.put(key: (mpkey | Int32(state)), modifiers: event.modifierFlags)
     }
 
     func signalMouseMovement(_ event: NSEvent) {
@@ -216,42 +183,8 @@ class View: NSView, CALayerDelegate {
         }
     }
 
-    func preciseScroll(_ event: NSEvent) {
-        var delta: Double
-        var cmd: Int32
-
-        if abs(event.deltaY) >= abs(event.deltaX) {
-            delta = Double(event.deltaY) * 0.1
-            cmd = delta > 0 ? SWIFT_WHEEL_UP : SWIFT_WHEEL_DOWN
-        } else {
-            delta = Double(event.deltaX) * 0.1
-            cmd = delta > 0 ? SWIFT_WHEEL_LEFT : SWIFT_WHEEL_RIGHT
-        }
-
-        input?.putAxis(cmd, modifiers: event.modifierFlags, delta: abs(delta))
-    }
-
     override func scrollWheel(with event: NSEvent) {
-        if !(input?.mouseEnabled() ?? true) {
-            return
-        }
-
-        if event.hasPreciseScrollingDeltas {
-            preciseScroll(event)
-        } else {
-            let modifiers = event.modifierFlags
-            let deltaX = modifiers.contains(.shift) ? event.scrollingDeltaY : event.scrollingDeltaX
-            let deltaY = modifiers.contains(.shift) ? event.scrollingDeltaX : event.scrollingDeltaY
-            var mpkey: Int32
-
-            if abs(deltaY) >= abs(deltaX) {
-                mpkey = deltaY > 0 ? SWIFT_WHEEL_UP : SWIFT_WHEEL_DOWN
-            } else {
-                mpkey = deltaX > 0 ? SWIFT_WHEEL_LEFT : SWIFT_WHEEL_RIGHT
-            }
-
-            input?.put(key: mpkey, modifiers: modifiers)
-        }
+        input?.processWheel(event: event)
     }
 
     func containsMouseLocation() -> Bool {
@@ -282,17 +215,5 @@ class View: NSView, CALayerDelegate {
     func canHideCursor() -> Bool {
         guard let window = common.window else { return false }
         return !hasMouseDown && containsMouseLocation() && window.isKeyWindow
-    }
-
-    func getMpvButton(_ event: NSEvent) -> Int32 {
-        let buttonNumber = event.buttonNumber
-        switch (buttonNumber) {
-            case 0:  return SWIFT_MBTN_LEFT
-            case 1:  return SWIFT_MBTN_RIGHT
-            case 2:  return SWIFT_MBTN_MID
-            case 3:  return SWIFT_MBTN_BACK
-            case 4:  return SWIFT_MBTN_FORWARD
-            default: return SWIFT_MBTN9 + Int32(buttonNumber - 5)
-        }
     }
 }

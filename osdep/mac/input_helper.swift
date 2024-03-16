@@ -115,6 +115,41 @@ class InputHelper: NSObject {
         }
     }
 
+    func processMouse(event: NSEvent) {
+        if !mouseEnabled() { return }
+        lock.withLock {
+            putKey(map(button: event.buttonNumber), modifiers: event.modifierFlags, type: event.type)
+            if event.clickCount > 1 {
+                putKey(map(button: event.buttonNumber), modifiers: event.modifierFlags, type: .keyUp)
+            }
+        }
+    }
+
+    func processWheel(event: NSEvent) {
+        if !mouseEnabled() { return }
+        lock.withLock {
+            guard let input = input else { return }
+            let modifiers = event.modifierFlags
+            let precise = event.hasPreciseScrollingDeltas
+            var deltaX = event.deltaX * 0.1
+            var deltaY = event.deltaY * 0.1
+
+            if !precise {
+                deltaX = modifiers.contains(.shift) ? event.scrollingDeltaY : event.scrollingDeltaX
+                deltaY = modifiers.contains(.shift) ? event.scrollingDeltaX : event.scrollingDeltaY
+            }
+
+            var key = deltaY > 0 ? SWIFT_WHEEL_UP : SWIFT_WHEEL_DOWN
+            var delta = Double(deltaY)
+            if abs(deltaX) > abs(deltaY) {
+                key = deltaX > 0 ? SWIFT_WHEEL_LEFT : SWIFT_WHEEL_RIGHT
+                delta = Double(deltaX)
+            }
+
+            mp_input_put_wheel(input, key | mapModifier(modifiers), precise ? abs(delta) : 1)
+        }
+    }
+
     func draggable(at pos: NSPoint) -> Bool {
         lock.withLock {
             guard let input = input else { return false }
@@ -129,17 +164,11 @@ class InputHelper: NSObject {
         }
     }
 
-    func setMouse(position pos: NSPoint) {
+    func setMouse(position: NSPoint) {
+        if !mouseEnabled() { return }
         lock.withLock {
             guard let input = input else { return }
-            mp_input_set_mouse_pos(input, Int32(pos.x), Int32(pos.y))
-        }
-    }
-
-    func putAxis(_ mpkey: Int32, modifiers: NSEvent.ModifierFlags, delta: Double) {
-        lock.withLock {
-            guard let input = input else { return }
-            mp_input_put_wheel(input, mpkey | mapModifier(modifiers), delta)
+            mp_input_set_mouse_pos(input, Int32(position.x), Int32(position.y))
         }
     }
 
@@ -158,6 +187,12 @@ class InputHelper: NSObject {
         let typeMapping: [NSEvent.EventType:UInt32] = [
             .keyDown: MP_KEY_STATE_DOWN,
             .keyUp: MP_KEY_STATE_UP,
+            .leftMouseDown: MP_KEY_STATE_DOWN,
+            .leftMouseUp: MP_KEY_STATE_UP,
+            .rightMouseDown: MP_KEY_STATE_DOWN,
+            .rightMouseUp: MP_KEY_STATE_UP,
+            .otherMouseDown: MP_KEY_STATE_DOWN,
+            .otherMouseUp: MP_KEY_STATE_UP,
         ]
 
         return Int32(typeMapping[type] ?? 0);
@@ -180,6 +215,18 @@ class InputHelper: NSObject {
         }
 
         return Int32(mask)
+    }
+
+    private func map(button: Int) -> Int32 {
+        let buttonMapping: [Int:Int32] = [
+            0: SWIFT_MBTN_LEFT,
+            1: SWIFT_MBTN_RIGHT,
+            2: SWIFT_MBTN_MID,
+            3: SWIFT_MBTN_FORWARD,
+            4: SWIFT_MBTN_BACK,
+        ]
+
+        return Int32(buttonMapping[button] ?? SWIFT_MBTN9 + Int32(button - 5));
     }
 
     @objc func open(files: [String]) {
