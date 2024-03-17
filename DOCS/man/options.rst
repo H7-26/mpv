@@ -3358,8 +3358,8 @@ Window
             of the screen width, or higher than 60% of the screen height.
 
 ``--autofit-larger=<[W[xH]]>``
-    This option behaves exactly like ``--autofit``, except the window size is
-    only changed if the window would be larger than the specified size.
+    This option behaves exactly like ``--autofit``, except that it sets the
+    maximum size of the window.
 
     .. admonition:: Example
 
@@ -3521,7 +3521,7 @@ Window
     Don't move the window when clicking on it and moving the mouse pointer.
 
 ``--x11-name=<string>``
-    Set the window class name for X11-based video output methods.
+    Set the window instance name for X11-based video output methods.
 
 ``--x11-netwm=<yes|no|auto>``
     (X11 only)
