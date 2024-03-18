@@ -185,6 +185,7 @@ struct vo_w32_state {
     BOOL win_arranging;
 
     bool conversion_mode_init;
+    bool unmaximize;
 };
 
 static void adjust_window_rect(struct vo_w32_state *w32, HWND hwnd, RECT *rc)
@@ -1022,14 +1023,13 @@ static void update_minimized_state(struct vo_w32_state *w32)
     }
 }
 
-static void update_maximized_state(struct vo_w32_state *w32)
+static void update_maximized_state(struct vo_w32_state *w32, bool leaving_fullscreen)
 {
     if (w32->parent)
         return;
 
-    // Don't change the maximized state in fullscreen for now. In future, this
-    // should be made to apply the maximized state on leaving fullscreen.
-    if (w32->current_fs)
+    // Apply the maximized state on leaving fullscreen.
+    if (w32->current_fs && !leaving_fullscreen)
         return;
 
     WINDOWPLACEMENT wp = { .length = sizeof wp };
@@ -1081,11 +1081,24 @@ static void update_window_state(struct vo_w32_state *w32)
                  wr.left, wr.top, rect_w(wr), rect_h(wr),
                  SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 
+    // Unmaximize the window if a size change is requested because SetWindowPos
+    // doesn't change the window maximized state.
+    // ShowWindow(SW_SHOWNOACTIVATE) can't be used here because it tries to
+    // "restore" the window to its size before it's maximized.
+    if (w32->unmaximize) {
+        WINDOWPLACEMENT wp = { .length = sizeof wp };
+        GetWindowPlacement(w32->window, &wp);
+        wp.showCmd = SW_SHOWNOACTIVATE;
+        wp.rcNormalPosition = wr;
+        SetWindowPlacement(w32->window, &wp);
+        w32->unmaximize = false;
+    }
+
     // Show the window if it's not yet visible
     if (!is_visible(w32->window)) {
         if (w32->opts->window_minimized) {
             ShowWindow(w32->window, SW_SHOWMINNOACTIVE);
-            update_maximized_state(w32); // Set the WPF_RESTORETOMAXIMIZED flag
+            update_maximized_state(w32, false); // Set the WPF_RESTORETOMAXIMIZED flag
         } else if (w32->opts->window_maximized) {
             ShowWindow(w32->window, SW_SHOWMAXIMIZED);
         } else {
@@ -2061,6 +2074,8 @@ static int gui_thread_control(struct vo_w32_state *w32, int request, void *arg)
             struct mp_vo_opts *vo_opts = w32->opts_cache->opts;
 
             if (changed_option == &vo_opts->fullscreen) {
+                if (!vo_opts->fullscreen)
+                    update_maximized_state(w32, true);
                 reinit_window_state(w32);
             } else if (changed_option == &vo_opts->window_affinity) {
                 update_affinity(w32);
@@ -2078,12 +2093,15 @@ static int gui_thread_control(struct vo_w32_state *w32, int request, void *arg)
             } else if (changed_option == &vo_opts->window_minimized) {
                 update_minimized_state(w32);
             } else if (changed_option == &vo_opts->window_maximized) {
-                update_maximized_state(w32);
+                update_maximized_state(w32, false);
             } else if (changed_option == &vo_opts->window_corners) {
                 update_corners_pref(w32);
             } else if (changed_option == &vo_opts->geometry || changed_option == &vo_opts->autofit ||
                 changed_option == &vo_opts->autofit_smaller || changed_option == &vo_opts->autofit_larger)
             {
+                if (w32->opts->window_maximized) {
+                    w32->unmaximize = true;
+                }
                 window_reconfig(w32, true);
             }
         }
@@ -2120,6 +2138,9 @@ static int gui_thread_control(struct vo_w32_state *w32, int request, void *arg)
         RECT *rc = w32->current_fs ? &w32->prev_windowrc : &w32->windowrc;
         resize_and_move_rect(w32, rc, s[0], s[1]);
 
+        if (w32->opts->window_maximized) {
+            w32->unmaximize = true;
+        }
         w32->fit_on_screen = true;
         reinit_window_state(w32);
         return VO_TRUE;
