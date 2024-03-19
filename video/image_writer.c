@@ -37,6 +37,7 @@
 #endif
 
 #include "osdep/io.h"
+#include "misc/path_utils.h"
 
 #include "common/av_common.h"
 #include "common/msg.h"
@@ -162,14 +163,8 @@ static void prepare_avframe(AVFrame *pic, AVCodecContext *avctx,
     );
 }
 
-static bool write_lavc(struct image_writer_ctx *ctx, mp_image_t *image, const char *filename)
+static bool write_lavc(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp)
 {
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
-        MP_ERR(ctx, "Error opening '%s' for writing!\n", filename);
-        return false;
-    }
-
     bool success = false;
     AVFrame *pic = NULL;
     AVPacket *pkt = NULL;
@@ -259,9 +254,6 @@ error_exit:
     avcodec_free_context(&avctx);
     av_frame_free(&pic);
     av_packet_free(&pkt);
-    success = success && !fclose(fp);
-    if (!success)
-        unlink(filename);
     return success;
 }
 
@@ -276,15 +268,8 @@ static void write_jpeg_error_exit(j_common_ptr cinfo)
   longjmp(*(jmp_buf*)cinfo->client_data, 1);
 }
 
-static bool write_jpeg(struct image_writer_ctx *ctx, mp_image_t *image,
-                       const char *filename)
+static bool write_jpeg(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp)
 {
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
-        MP_ERR(ctx, "Error opening '%s' for writing!\n", filename);
-        return false;
-    }
-
     struct jpeg_compress_struct cinfo;
     struct jpeg_error_mgr jerr;
 
@@ -295,8 +280,6 @@ static bool write_jpeg(struct image_writer_ctx *ctx, mp_image_t *image,
     cinfo.client_data = &error_return_jmpbuf;
     if (setjmp(cinfo.client_data)) {
         jpeg_destroy_compress(&cinfo);
-        fclose(fp);
-        unlink(filename);
         return false;
     }
 
@@ -333,10 +316,7 @@ static bool write_jpeg(struct image_writer_ctx *ctx, mp_image_t *image,
 
     jpeg_destroy_compress(&cinfo);
 
-    if (!fclose(fp))
-        return true;
-    unlink(filename);
-    return false;
+    return true;
 }
 
 #endif
@@ -360,8 +340,7 @@ static void log_side_data(struct image_writer_ctx *ctx, AVPacketSideData *data,
     }
 }
 
-static bool write_avif(struct image_writer_ctx *ctx, mp_image_t *image,
-                       const char *filename)
+static bool write_avif(struct image_writer_ctx *ctx, mp_image_t *image, FILE *fp)
 {
     const AVCodec *codec = NULL;
     const AVOutputFormat *ofmt = NULL;
@@ -429,11 +408,8 @@ static bool write_avif(struct image_writer_ctx *ctx, mp_image_t *image,
         goto free_data;
     }
 
-    ret = avio_open(&avioctx, filename, AVIO_FLAG_WRITE);
-    if (ret < 0) {
-        MP_ERR(ctx, "Could not open file '%s' for saving images\n", filename);
-        goto free_data;
-    }
+    avio_open_dyn_buf(&avioctx);
+    MP_HANDLE_OOM(avioctx);
 
     fmtctx = avformat_alloc_context();
     if (!fmtctx) {
@@ -511,10 +487,12 @@ static bool write_avif(struct image_writer_ctx *ctx, mp_image_t *image,
     }
     MP_DBG(ctx, "write_avif(): avio_size() = %"PRIi64"\n", avio_size(avioctx));
 
-    success = true;
+    uint8_t *buf = NULL;
+    int written_size = avio_close_dyn_buf(avioctx, &buf);
+    success = fwrite(buf, written_size, 1, fp) == 1;
+    av_freep(&buf);
 
 free_data:
-    success = !avio_closep(&avioctx) && success;
     avformat_free_context(fmtctx);
     avcodec_free_context(&avctx);
     av_packet_free(&pkt);
@@ -705,7 +683,7 @@ static struct mp_image *convert_image(struct mp_image *image, int destfmt,
 
 bool write_image(struct mp_image *image, const struct image_writer_opts *opts,
                  const char *filename, struct mpv_global *global,
-                 struct mp_log *log)
+                 struct mp_log *log, bool overwrite)
 {
     struct image_writer_opts defs = image_writer_opts_defaults;
     if (!opts)
@@ -714,7 +692,7 @@ bool write_image(struct mp_image *image, const struct image_writer_opts *opts,
     mp_verbose(log, "input: %s\n", mp_image_params_to_str(&image->params));
 
     struct image_writer_ctx ctx = { log, opts, image->fmt };
-    bool (*write)(struct image_writer_ctx *, mp_image_t *, const char *) = write_lavc;
+    bool (*write)(struct image_writer_ctx *, mp_image_t *, FILE *) = write_lavc;
     int destfmt = 0;
 
 #if HAVE_JPEG
@@ -751,10 +729,21 @@ bool write_image(struct mp_image *image, const struct image_writer_opts *opts,
     if (!dst)
         return false;
 
-    bool success = write(&ctx, dst, filename);
-    if (!success)
-        mp_err(log, "Error writing file '%s'!\n", filename);
+    bool success = false;
+    FILE *fp = fopen(filename, overwrite ? "wb" : "wbx");
+    if (!fp) {
+        mp_err(log, "Error creating '%s' for writing: %s!\n",
+               filename, mp_strerror(errno));
+        goto done;
+    }
 
+    success = write(&ctx, dst, fp);
+    if (fclose(fp) || !success) {
+        mp_err(log, "Error writing file '%s'!\n", filename);
+        unlink(filename);
+    }
+
+done:
     talloc_free(dst);
     return success;
 }
@@ -763,5 +752,5 @@ void dump_png(struct mp_image *image, const char *filename, struct mp_log *log)
 {
     struct image_writer_opts opts = image_writer_opts_defaults;
     opts.format = AV_CODEC_ID_PNG;
-    write_image(image, &opts, filename, NULL, log);
+    write_image(image, &opts, filename, NULL, log, true);
 }
