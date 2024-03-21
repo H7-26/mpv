@@ -1147,9 +1147,10 @@ if features['egl-angle']
     sources += files('video/out/opengl/angle_dynamic.c')
 endif
 
-egl_dep = cc.find_library('EGL', required: get_option('egl-angle-lib'))
+egl_dep = cc.find_library('EGL', required:
+    get_option('egl-angle-lib').require(features['egl-angle']))
 egl_angle_lib = get_option('egl-angle-lib').require(
-    features['egl-angle'] and cc.has_function('eglCreateWindowSurface',
+    egl_dep.found() and cc.has_function('eglCreateWindowSurface',
                                                dependencies: egl_dep,
                                                prefix: '#include <EGL/egl.h>'),
     error_message: 'egl-angle-lib could not be found!',
@@ -1172,7 +1173,7 @@ if features['d3d11'] or features['egl-angle-win32']
     sources += files('video/out/gpu/d3d11_helpers.c')
 endif
 
-egl = dependency('egl', version: '> 1.4.0', required: get_option('egl'))
+egl = dependency('egl', version: '>= 1.4.0', required: get_option('egl'))
 features += {'egl': egl.found() and gl_allowed}
 if features['egl']
     dependencies += egl
@@ -1226,12 +1227,11 @@ if plain_gl.allowed()
     features += {'gl': true}
 endif
 
-features += {'egl-helpers': features['egl'] or egl_android.found() or egl_angle_win32.allowed()}
-if features['egl-helpers']
+if features['egl'] or features['egl-android'] or features['egl-angle-win32']
     sources += files('video/out/opengl/egl_helpers.c')
 endif
 
-if features['egl'] and features['egl-helpers']
+if features['gl'] and features['egl']
     sources += files('video/filter/vf_gpu.c')
 endif
 
@@ -1520,11 +1520,12 @@ if features['cocoa'] and features['swift']
     swift_sources += files('osdep/mac/libmpv_helper.swift',
                            'osdep/mac/input_helper.swift',
                            'osdep/mac/log_helper.swift',
-                           'osdep/mac/mpv_helper.swift',
                            'osdep/mac/menu_bar.swift',
+                           'osdep/mac/option_helper.swift',
                            'osdep/mac/precise_timer.swift',
                            'osdep/mac/swift_compat.swift',
                            'osdep/mac/swift_extensions.swift',
+                           'osdep/mac/type_helper.swift',
                            'video/out/mac/common.swift',
                            'video/out/mac/title_bar.swift',
                            'video/out/mac/view.swift',
