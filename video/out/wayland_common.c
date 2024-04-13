@@ -222,6 +222,7 @@ static int spawn_cursor(struct vo_wayland_state *wl);
 
 static void add_feedback(struct vo_wayland_feedback_pool *fback_pool,
                          struct wp_presentation_feedback *fback);
+static void apply_keepaspect(struct vo_wayland_state *wl, int *width, int *height);
 static void get_shape_device(struct vo_wayland_state *wl, struct vo_wayland_seat *s);
 static int greatest_common_divisor(int a, int b);
 static void guess_focus(struct vo_wayland_state *wl);
@@ -1106,18 +1107,24 @@ static void handle_toplevel_config(void *data, struct xdg_toplevel *toplevel,
         wl->hidden = is_suspended;
 
     if (vo_opts->fullscreen != is_fullscreen) {
+        wl->state_change = wl->reconfigured;
         vo_opts->fullscreen = is_fullscreen;
         m_config_cache_write_opt(wl->vo_opts_cache, &vo_opts->fullscreen);
     }
 
     if (vo_opts->window_maximized != is_maximized) {
+        wl->state_change = wl->reconfigured;
         vo_opts->window_maximized = is_maximized;
         m_config_cache_write_opt(wl->vo_opts_cache, &vo_opts->window_maximized);
     }
 
+    if (!is_tiled && wl->tiled)
+        wl->state_change = wl->reconfigured;
+
     wl->tiled = is_tiled;
 
     wl->locked_size = is_fullscreen || is_maximized || is_tiled;
+    wl->reconfigured = false;
 
     if (wl->requested_decoration)
         request_decoration_mode(wl, wl->requested_decoration);
@@ -1149,12 +1156,7 @@ static void handle_toplevel_config(void *data, struct xdg_toplevel *toplevel,
     }
 
     if (!wl->locked_size) {
-        if (vo_opts->keepaspect) {
-            double scale_factor = (double)width / wl->reduced_width;
-            width = ceil(wl->reduced_width * scale_factor);
-            if (vo_opts->keepaspect_window)
-                height = ceil(wl->reduced_height * scale_factor);
-        }
+        apply_keepaspect(wl, &width, &height);
         wl->window_size.x0 = 0;
         wl->window_size.y0 = 0;
         wl->window_size.x1 = lround(width * wl->scaling);
@@ -1561,6 +1563,17 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 /* Static functions */
+static void apply_keepaspect(struct vo_wayland_state *wl, int *width, int *height)
+{
+    if (!wl->vo_opts->keepaspect)
+        return;
+
+    double scale_factor = (double)*width / wl->reduced_width;
+    *width = ceil(wl->reduced_width * scale_factor);
+    if (wl->vo_opts->keepaspect_window)
+        *height = ceil(wl->reduced_height * scale_factor);
+}
+
 static void free_dnd_data(struct vo_wayland_state *wl)
 {
     // caller should close wl->dnd_fd if appropriate
@@ -2100,6 +2113,8 @@ static void set_window_bounds(struct vo_wayland_state *wl)
         return;
     }
 
+    apply_keepaspect(wl, &wl->bounded_width, &wl->bounded_height);
+
     if (wl->bounded_width && wl->bounded_width < wl->window_size.x1)
         wl->window_size.x1 = wl->bounded_width;
     if (wl->bounded_height && wl->bounded_height < wl->window_size.y1)
@@ -2154,6 +2169,7 @@ static void toggle_fullscreen(struct vo_wayland_state *wl)
         struct vo_wayland_output *output = find_output(wl);
         xdg_toplevel_set_fullscreen(wl->xdg_toplevel, output->output);
     } else {
+        wl->state_change = wl->reconfigured;
         xdg_toplevel_unset_fullscreen(wl->xdg_toplevel);
     }
 }
@@ -2163,6 +2179,7 @@ static void toggle_maximized(struct vo_wayland_state *wl)
     if (wl->vo_opts->window_maximized) {
         xdg_toplevel_set_maximized(wl->xdg_toplevel);
     } else {
+        wl->state_change = wl->reconfigured;
         xdg_toplevel_unset_maximized(wl->xdg_toplevel);
     }
 }
@@ -2606,25 +2623,29 @@ bool vo_wayland_reconfig(struct vo *vo)
     if (wl->vo_opts->auto_window_resize || !wl->geometry_configured)
         set_geometry(wl, false);
 
+    if (wl->geometry_configured && wl->vo_opts->auto_window_resize)
+        wl->reconfigured = true;
+
     if (wl->opts->configure_bounds)
         set_window_bounds(wl);
-
-    if (!wl->geometry_configured || !wl->locked_size) {
-        wl->geometry = wl->window_size;
-        wl->geometry_configured = true;
-    }
 
     if (wl->vo_opts->cursor_passthrough)
         set_input_region(wl, true);
 
-    if (wl->vo_opts->fullscreen)
-        toggle_fullscreen(wl);
+    if (!wl->geometry_configured || !wl->locked_size)
+        wl->geometry = wl->window_size;
 
-    if (wl->vo_opts->window_maximized)
-        toggle_maximized(wl);
+    if (!wl->geometry_configured) {
+        if (wl->vo_opts->fullscreen)
+            toggle_fullscreen(wl);
 
-    if (wl->vo_opts->window_minimized)
-        do_minimize(wl);
+        if (wl->vo_opts->window_maximized)
+            toggle_maximized(wl);
+
+        if (wl->vo_opts->window_minimized)
+            do_minimize(wl);
+        wl->geometry_configured = true;
+    }
 
     prepare_resize(wl);
 
