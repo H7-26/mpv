@@ -216,9 +216,9 @@ static void prepare_prefix(struct mp_log_root *root, bstr *out, int lev, int ter
 
     // Set cursor state
     if (new_lines && !root->status_lines) {
-        bstr_xappend(root, out, bstr0("\033[?25l"));
+        bstr_xappend(root, out, bstr0(TERM_ESC_HIDE_CURSOR));
     } else if (!new_lines && root->status_lines) {
-        bstr_xappend(root, out, bstr0("\033[?25h"));
+        bstr_xappend(root, out, bstr0(TERM_ESC_RESTORE_CURSOR));
     }
 
     int line_skip = 0;
@@ -563,12 +563,9 @@ void mp_msg_va(struct mp_log *log, int lev, const char *format, va_list va)
         int fileno = term_msg_fileno(root, lev);
         FILE *stream = fileno == STDERR_FILENO ? stderr : stdout;
         if (root->term_msg.len) {
-            if (root->term_status_msg.len) {
-                fprintf(stream, "%.*s%.*s", BSTR_P(root->term_msg),
-                        BSTR_P(root->term_status_msg));
-            } else {
-                fprintf(stream, "%.*s", BSTR_P(root->term_msg));
-            }
+            fwrite(root->term_msg.start, root->term_msg.len, 1, stream);
+            if (root->term_status_msg.len)
+                fwrite(root->term_status_msg.start, root->term_status_msg.len, 1, stream);
             fflush(stream);
         }
     }
