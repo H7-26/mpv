@@ -820,7 +820,10 @@ static void parse_trackentry(struct demuxer *demuxer,
         MP_DBG(demuxer, "|  + CodecPrivate, length %u\n", track->private_size);
     }
 
-    if (entry->language) {
+    if (entry->language_bcp47) {
+        track->language = talloc_strdup(track, entry->language_bcp47);
+        MP_DBG(demuxer, "|  + LanguageBCP47: %s\n", track->language);
+    } else if (entry->language) {
         track->language = talloc_strdup(track, entry->language);
         MP_DBG(demuxer, "|  + Language: %s\n", track->language);
     } else {
@@ -1107,8 +1110,8 @@ static int demux_mkv_read_chapters(struct demuxer *demuxer)
                 }
             }
 
-            MP_DBG(demuxer, "Chapter %u from %02d:%02d:%02d.%03d "
-                   "to %02d:%02d:%02d.%03d, %s\n", i,
+            MP_DBG(demuxer, "Chapter %u from %02d:%02d:%02d.%09d "
+                   "to %02d:%02d:%02d.%09d, %s\n", i,
                    (int) (chapter.start / 60 / 60 / 1000000000),
                    (int) ((chapter.start / 60 / 1000000000) % 60),
                    (int) ((chapter.start / 1000000000) % 60),
