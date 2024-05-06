@@ -312,7 +312,9 @@ features += {'dos-paths': win32, 'win32': win32}
 
 mswin_flags = ['-D_WIN32_WINNT=0x0602', '-DWINVER=0x0602', '-DUNICODE',
                '-DCOBJMACROS', '-DINITGUID', '-U__STRICT_ANSI__', '-DNOMINMAX',
-               '-D_USE_MATH_DEFINES', '-DWIN32_LEAN_AND_MEAN']
+               '-D_USE_MATH_DEFINES', '-DWIN32_LEAN_AND_MEAN',
+               '-D_CRT_DECLARE_NONSTDC_NAMES', '-D_CRT_NONSTDC_NO_WARNINGS',
+               '-D_CRT_SECURE_NO_WARNINGS']
 
 if host_machine.system() == 'windows'
     flags += [mswin_flags]
@@ -1807,7 +1809,7 @@ if get_option('cplayer')
     install_data('etc/mpv-symbolic.svg', install_dir: join_paths(hicolor_dir, 'symbolic', 'apps'))
 
     mpv = executable('mpv', main_fn_source, objects: libmpv.extract_all_objects(recursive: true), dependencies: dependencies,
-                     win_subsystem: 'windows,6.0', install: true)
+                     win_subsystem: 'windows', install: true)
 
     # Older meson versions generate this in the player subdirectory.
     if win32 and meson.version().version_compare('>= 1.3.0')

@@ -15,6 +15,7 @@ test_utils_files = [
     'common/common.c',
     'misc/bstr.c',
     'misc/dispatch.c',
+    'misc/io_utils.c',
     'misc/json.c',
     'misc/node.c',
     'misc/path_utils.c',
@@ -121,10 +122,10 @@ if get_option('libmpv')
     exe = executable('libmpv-test', 'libmpv_test.c',
                      include_directories: incdir, link_with: libmpv)
     file = join_paths(source_root, 'etc', 'mpv-icon-8bit-16x16.png')
-    test('libmpv', exe, args: file, timeout: 60)
+    test('libmpv', exe, args: file, timeout: 60, should_fail: not features['lua'])
 
     exe = executable('libmpv-encode', 'libmpv_encode.c',
-                     include_directories: incdir, link_with: libmpv)
+                     include_directories: incdir, link_with: [libmpv, test_utils])
     test('libmpv-encode', exe, timeout: 30)
 endif
 
