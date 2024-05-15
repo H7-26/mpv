@@ -299,10 +299,16 @@ static int open_f(stream_t *stream, const struct stream_open_args *args)
     if (strncmp(url, "fd://", 5) == 0 || is_fdclose) {
         char *begin = strstr(stream->url, "://") + 3, *end = NULL;
         p->fd = strtol(begin, &end, 0);
-        if (!end || end == begin || end[0]) {
-            MP_ERR(stream, "Invalid FD: %s\n", stream->url);
+        if (!end || end == begin || end[0] || p->fd < 0) {
+            MP_ERR(stream, "Invalid FD number: %s\n", stream->url);
             return STREAM_ERROR;
         }
+#ifdef F_SETFD
+        if (fcntl(p->fd, F_GETFD) == -1) {
+            MP_ERR(stream, "Invalid FD: %d\n", p->fd);
+            return STREAM_ERROR;
+        }
+#endif
         if (is_fdclose)
             p->close = true;
     } else if (!strict_fs && !strcmp(filename, "-")) {
@@ -337,8 +343,6 @@ static int open_f(stream_t *stream, const struct stream_open_args *args)
     if (fstat(p->fd, &st) == 0) {
         if (S_ISDIR(st.st_mode)) {
             stream->is_directory = true;
-            if (!(args->flags & STREAM_LESS_NOISE))
-                MP_INFO(stream, "This is a directory - adding to playlist.\n");
         } else if (S_ISREG(st.st_mode)) {
             p->regular_file = true;
 #ifndef _WIN32
