@@ -60,7 +60,7 @@ local o = {
     shadow_y_offset = 0.0,
     shadow_color = "",
     alpha = "11",
-    vidscale = true,
+    vidscale = "auto",
 
     -- Custom header for ASS tags to style the text output.
     -- Specifying this will ignore the text style values above and just
@@ -1353,10 +1353,17 @@ local function print_page(page, after_scroll)
     end
 end
 
-local function update_scale(_, value)
+local function update_scale(value)
+    local scale_with_video
+    if o.vidscale == "auto" then
+        scale_with_video = mp.get_property_native("osd-scale-by-window")
+    else
+        scale_with_video = o.vidscale == "yes"
+    end
+
     -- Calculate scaled metrics.
     local scale = 1
-    if not o.vidscale and value > 0 then
+    if not scale_with_video and value > 0 then
         scale = 720 / value
     end
     font_size = o.font_size * scale
@@ -1367,6 +1374,15 @@ local function update_scale(_, value)
     if display_timer:is_enabled() then
         print_page(curr_page)
     end
+end
+
+local function handle_osd_height_update(_, value)
+    update_scale(value)
+end
+
+local function handle_osd_scale_by_window_update()
+    local value = mp.get_property_native("osd-height")
+    update_scale(value)
 end
 
 local function clear_screen()
@@ -1597,4 +1613,5 @@ if o.bindlist ~= "no" then
     end)
 end
 
-mp.observe_property('osd-height', 'native', update_scale)
+mp.observe_property('osd-height', 'native', handle_osd_height_update)
+mp.observe_property('osd-scale-by-window', 'native', handle_osd_scale_by_window_update)

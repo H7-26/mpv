@@ -14,7 +14,7 @@ local user_opts = {
     idlescreen = true,          -- show mpv logo on idle
     scalewindowed = 1,          -- scaling of the controller when windowed
     scalefullscreen = 1,        -- scaling of the controller when fullscreen
-    vidscale = true,            -- scale the controller with the video?
+    vidscale = "auto",          -- scale the controller with the video?
     valign = 0.8,               -- vertical alignment, -1 (top) to 1 (bottom)
     halign = 0,                 -- horizontal alignment, -1 (left) to 1 (right)
     barmargin = 0,              -- vertical margin of top/bottombar
@@ -1785,7 +1785,14 @@ function osc_init()
         scale = user_opts.scalewindowed
     end
 
-    if user_opts.vidscale then
+    local scale_with_video
+    if user_opts.vidscale == "auto" then
+        scale_with_video = mp.get_property_native("osd-scale-by-window")
+    else
+        scale_with_video = user_opts.vidscale == "yes"
+    end
+
+    if scale_with_video then
         osc_param.unscaled_y = baseResY
     else
         osc_param.unscaled_y = display_h
@@ -2844,6 +2851,7 @@ mp.observe_property("osd-dimensions", "native", function()
     --  we might have to worry about property update ordering)
     request_init_resize()
 end)
+mp.observe_property('osd-scale-by-window', 'native', request_init_resize)
 
 -- mouse show/hide bindings
 mp.set_key_bindings({
