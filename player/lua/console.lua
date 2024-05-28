@@ -1184,7 +1184,7 @@ local function complete_match(part, list)
     local prefix = find_common_prefix(completions)
 
     if opts.case_sensitive then
-        return completions, prefix
+        return completions, prefix or part
     end
 
     completions = {}
@@ -1302,7 +1302,7 @@ function complete(backwards)
 
     -- Add an empty token if the cursor is after whitespace to simplify
     -- comparisons.
-    if before_cur == '' or before_cur:find('%s$') then
+    if before_cur == '' or before_cur:find('[%s;]$') then
         tokens[#tokens + 1] = { text = "", pos = cursor }
     end
 
