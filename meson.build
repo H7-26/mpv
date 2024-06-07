@@ -285,7 +285,9 @@ test_flags = ['-Wdisabled-optimization',
               '-Wno-sign-compare',
               '-Wno-switch',
               '-Wno-unused-parameter',
-              '-fno-math-errno']
+              '-fno-math-errno',
+              '-fno-signed-zeros',
+              '-fno-trapping-math']
 
 flags += cc.get_supported_arguments(test_flags)
 
