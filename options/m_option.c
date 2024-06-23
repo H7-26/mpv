@@ -2665,11 +2665,11 @@ static int parse_timestring(struct bstr str, double *time, char endchar)
     if (bstr_sscanf(str, "%d:%d:%lf%n", &h, &m, &s, &len) >= 3) {
         if (m >= 60 || s >= 60)
             return 0; /* minutes or seconds are out of range */
-        *time = 3600 * h + 60 * m + s;
+        *time = 3600.0 * h + 60 * m + s;
     } else if (bstr_sscanf(str, "%d:%lf%n", &m, &s, &len) >= 2) {
         if (s >= 60)
             return 0; /* seconds are out of range */
-        *time = 60 * m + s;
+        *time = 60.0 * m + s;
     } else if (bstr_sscanf(str, "%lf%n", &s, &len) >= 1) {
         *time = s;
     } else {
@@ -3435,6 +3435,7 @@ static int parse_obj_settings_list(struct mp_log *log, const m_option_t *opt,
                     };
                     if (!obj_settings_list_insert_at(log, &res, -1, &item)) {
                         obj_setting_free(&item);
+                        free_obj_settings_list(&res);
                         ret = M_OPT_OUT_OF_RANGE;
                         goto done;
                     }
@@ -3464,6 +3465,7 @@ static int parse_obj_settings_list(struct mp_log *log, const m_option_t *opt,
                 if (label < 0) {
                     if (!obj_settings_list_insert_at(log, &list, prepend_counter, &res[n])) {
                         obj_setting_free(&res[n]);
+                        free_obj_settings_list(&res);
                         ret = M_OPT_OUT_OF_RANGE;
                         goto done;
                     }
@@ -3482,6 +3484,7 @@ static int parse_obj_settings_list(struct mp_log *log, const m_option_t *opt,
                 if (label < 0) {
                     if (!obj_settings_list_insert_at(log, &list, -1, &res[n])) {
                         obj_setting_free(&res[n]);
+                        free_obj_settings_list(&res);
                         ret = M_OPT_OUT_OF_RANGE;
                         goto done;
                     }
@@ -3511,6 +3514,7 @@ static int parse_obj_settings_list(struct mp_log *log, const m_option_t *opt,
                     if (found < 0) {
                         if (!obj_settings_list_insert_at(log, &list, -1, &res[n])) {
                             obj_setting_free(&res[n]);
+                            free_obj_settings_list(&res);
                             ret = M_OPT_OUT_OF_RANGE;
                             goto done;
                         }
