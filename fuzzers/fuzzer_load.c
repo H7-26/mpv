@@ -28,8 +28,15 @@
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
-#if defined(MPV_LOAD_CONFIG_FILE) || defined(MPV_LOAD_INPUT_CONF)
-    if (memmem(data, size, "include", sizeof("include") - 1))
+#ifdef MPV_LOAD_CONFIG_FILE
+    // config file size limit, see m_config_parse_config_file()
+    if (size > 1000000000)
+        return 0;
+#endif
+
+#ifdef MPV_LOAD_INPUT_CONF
+    // input config file size limit, see parse_config_file() in input.c
+    if (size > 1000000)
         return 0;
 #endif
 
