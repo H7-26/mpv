@@ -212,7 +212,7 @@ static int spawn_cursor(struct vo_wayland_state *wl);
 static void add_feedback(struct vo_wayland_feedback_pool *fback_pool,
                          struct wp_presentation_feedback *fback);
 static void apply_keepaspect(struct vo_wayland_state *wl, int *width, int *height);
-static void get_gpu_drm_formats(struct vo_wayland_state *wl);
+static void get_planar_drm_formats(struct vo_wayland_state *wl);
 static void get_shape_device(struct vo_wayland_state *wl, struct vo_wayland_seat *s);
 static void guess_focus(struct vo_wayland_state *wl);
 static void handle_key_input(struct vo_wayland_seat *s, uint32_t key, uint32_t state, bool no_emit);
@@ -1406,7 +1406,7 @@ static void tranche_target_device(void *data,
             memcpy(&wl->target_device_id, id, sizeof(dev_t));
             break;
         }
-        get_gpu_drm_formats(wl);
+        get_planar_drm_formats(wl);
     }
 }
 
@@ -1828,7 +1828,7 @@ static char **get_displays_spanned(struct vo_wayland_state *wl)
     return names;
 }
 
-static void get_gpu_drm_formats(struct vo_wayland_state *wl)
+static void get_planar_drm_formats(struct vo_wayland_state *wl)
 {
 #if HAVE_DRM
     drmDevice *device = NULL;
@@ -1880,14 +1880,14 @@ static void get_gpu_drm_formats(struct vo_wayland_state *wl)
     // Only check the formats on the first primary plane we find as a crude guess.
     int index = -1;
     for (int i = 0; i < res->count_planes; ++i) {
-	    drmModeObjectProperties *props = NULL;
-		props = drmModeObjectGetProperties(fd, res->planes[i], DRM_MODE_OBJECT_PLANE);
+        drmModeObjectProperties *props = NULL;
+        props = drmModeObjectGetProperties(fd, res->planes[i], DRM_MODE_OBJECT_PLANE);
         if (!props) {
             MP_VERBOSE(wl, "Unable to get DRM plane properties: %s\n", mp_strerror(errno));
             continue;
         }
         for (int j = 0; j < props->count_props; ++j) {
-		    drmModePropertyRes *prop = drmModeGetProperty(fd, props->props[j]);
+            drmModePropertyRes *prop = drmModeGetProperty(fd, props->props[j]);
             if (!prop) {
                 MP_VERBOSE(wl, "Unable to get DRM plane property: %s\n", mp_strerror(errno));
                 continue;
@@ -1898,7 +1898,7 @@ static void get_gpu_drm_formats(struct vo_wayland_state *wl)
                         index = i;
                 }
             }
-		    drmModeFreeProperty(prop);
+            drmModeFreeProperty(prop);
             if (index > -1)
                 break;
         }
@@ -1913,15 +1913,15 @@ static void get_gpu_drm_formats(struct vo_wayland_state *wl)
     }
 
     plane = drmModeGetPlane(fd, res->planes[index]);
-    wl->num_gpu_formats = plane->count_formats;
+    wl->num_planar_formats = plane->count_formats;
 
-    if (wl->gpu_formats)
-        talloc_free(wl->gpu_formats);
+    if (wl->planar_formats)
+        talloc_free(wl->planar_formats);
 
-    wl->gpu_formats = talloc_zero_array(wl, int, wl->num_gpu_formats);
-    for (int i = 0; i < wl->num_gpu_formats; ++i) {
+    wl->planar_formats = talloc_zero_array(wl, int, wl->num_planar_formats);
+    for (int i = 0; i < wl->num_planar_formats; ++i) {
         MP_DBG(wl, "DRM primary plane supports drm format: %s\n", mp_tag_str(plane->formats[i]));
-        wl->gpu_formats[i] = plane->formats[i];
+        wl->planar_formats[i] = plane->formats[i];
     }
 
 done:
