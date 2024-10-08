@@ -907,6 +907,8 @@ Program Behavior
         should use ``%`` before any of the characters ``^$()%|,.[]*+-?`` to
         match that character.
 
+        URLs are converted to lower case before matching.
+
         .. admonition:: Examples
 
             - ``--script-opts=ytdl_hook-exclude='^youtube%.com'``
@@ -916,6 +918,13 @@ Program Behavior
               will exclude any URL that ends with ``.mkv`` or ``.mp4``.
 
         See more lua patterns here: https://www.lua.org/manual/5.1/manual.html#5.4.1
+
+    ``include=<URL1|URL2|...``
+        A ``|``-separated list of URL patterns which mpv should try to parse with
+        youtube-dl first when ``try_ytdl_first`` is ``no``. The patterns are
+        matched in the same way as ``exclude``.
+
+        Default: ``^%w+%.youtube%.com/|^youtube%.com/|^youtu%.be/|^%w+%.twitch%.tv/|^twitch%.tv/``
 
     ``all_formats=<yes|no>``
         If 'yes' will attempt to add all formats found reported by youtube-dl
