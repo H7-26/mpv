@@ -79,6 +79,7 @@ local line = ''
 local cursor = 1
 local default_prompt = '>'
 local prompt = default_prompt
+local bottom_left_margin = 6
 local default_id = 'default'
 local id = default_id
 local histories = {[id] = {}}
@@ -275,12 +276,12 @@ local function calculate_max_log_lines()
                select(2, mp.get_property('term-status-msg'):gsub('\\n', ''))
     end
 
-    return math.floor(select(2, get_scaled_osd_dimensions())
+    return math.floor((select(2, get_scaled_osd_dimensions()) - bottom_left_margin)
                       * (1 - global_margins.t - global_margins.b)
                       / opts.font_size
-                      -- Subtract 1 for the input line and 1 for the newline
-                      -- between the log and the input line.
-                      - 2)
+                      -- Subtract 1 for the input line and 0.5 for the empty
+                      -- line between the log and the input line.
+                      - 1.5)
 end
 
 -- Takes a list of strings, a max width in characters and
@@ -512,8 +513,6 @@ local function update()
     end
 
     local screenx, screeny = get_scaled_osd_dimensions()
-
-    local bottom_left_margin = 6
 
     local coordinate_top = math.floor(global_margins.t * screeny + 0.5)
     local clipping_coordinates = '0,' .. coordinate_top .. ',' ..
@@ -826,7 +825,7 @@ local function determine_hovered_item()
     -- Calculate how many lines could be printed without decreasing them for
     -- the input line and OSC.
     local max_lines = height / opts.font_size
-    local clicked_line = math.floor(y / height * max_lines + .5)
+    local clicked_line = math.ceil(y / height * max_lines)
 
     local offset = first_match_to_print - 1
     local min_line = 1
