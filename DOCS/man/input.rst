@@ -924,11 +924,12 @@ Remember to quote string arguments in input.conf (see `Flat command syntax`_).
     empty string, ``KEYUP`` will be set on all keys. Otherwise, ``KEYUP`` will
     only be set on the key specified by ``name``.
 
-``keybind <name> <command>``
-    Binds a key to an input command. ``command`` must be a complete command
+``keybind <name> <cmd> [<comment>]``
+    Binds a key to an input command. ``cmd`` must be a complete command
     containing all the desired arguments and flags. Both ``name`` and
-    ``command`` use the ``input.conf`` naming scheme. This is primarily
-    useful for the client API.
+    ``cmd`` use the ``input.conf`` naming scheme. ``comment`` is an optional
+    string which can be read as the ``comment`` entry of ``input-bindings``.
+    This is primarily useful for the client API.
 
 ``audio-add <url> [<flags> [<title> [<lang>]]]``
     Load the given audio file. See ``sub-add`` command.
@@ -1935,12 +1936,12 @@ information. They can be manipulated with the ``set``/``add``/``cycle``
 commands, and retrieved with ``show-text``, or anything else that uses property
 expansion. (See `Property Expansion`_.)
 
-The property name is annotated with RW to indicate whether the property is
-generally writable.
-
 If an option is referenced, the property will normally take/return exactly the
 same values as the option. In these cases, properties are merely a way to change
 an option at runtime.
+
+Note that many properties are unavailable at startup. See `Details on the script
+initialization and lifecycle`_.
 
 Property list
 -------------
@@ -2002,8 +2003,7 @@ Property list
     Full path of the currently played file. Usually this is exactly the same
     string you pass on the mpv command line or the ``loadfile`` command, even
     if it's a relative path. If you expect an absolute path, you will have to
-    determine it yourself, for example by using the ``working-directory``
-    property.
+    determine it yourself, for example by using the ``normalize-path`` command.
 
 ``stream-open-filename``
     The full path to the currently played media. This is different from
