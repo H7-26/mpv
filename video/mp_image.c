@@ -856,6 +856,21 @@ bool mp_image_params_static_equal(const struct mp_image_params *p1,
     return mp_image_params_equal(&a, &b);
 }
 
+void mp_image_params_update_dynamic(struct mp_image_params *dst,
+                                    const struct mp_image_params *src,
+                                    bool has_peak_detect_values)
+{
+    dst->repr.dovi = src->repr.dovi;
+    // Don't overwrite peak-detected HDR metadata if available.
+    float max_pq_y = dst->color.hdr.max_pq_y;
+    float avg_pq_y = dst->color.hdr.avg_pq_y;
+    dst->color.hdr = src->color.hdr;
+    if (has_peak_detect_values) {
+        dst->color.hdr.max_pq_y = max_pq_y;
+        dst->color.hdr.avg_pq_y = avg_pq_y;
+    }
+}
+
 // Restore color system, transfer, and primaries to their original values
 // before dovi mapping.
 void mp_image_params_restore_dovi_mapping(struct mp_image_params *params)
@@ -960,10 +975,8 @@ void mp_image_params_guess_csp(struct mp_image_params *params)
         if (params->color.transfer == PL_COLOR_TRC_UNKNOWN)
             params->color.transfer = PL_COLOR_TRC_BT_1886;
     } else if (forced_csp == PL_COLOR_SYSTEM_RGB) {
-        if (params->repr.sys == PL_COLOR_SYSTEM_UNKNOWN)
-            params->repr.sys = PL_COLOR_SYSTEM_RGB;
-        if (params->repr.levels == PL_COLOR_LEVELS_UNKNOWN)
-            params->repr.levels = PL_COLOR_LEVELS_FULL;
+        params->repr.sys = PL_COLOR_SYSTEM_RGB;
+        params->repr.levels = PL_COLOR_LEVELS_FULL;
 
         // The majority of RGB content is either sRGB or (rarely) some other
         // color space which we don't even handle, like AdobeRGB or
