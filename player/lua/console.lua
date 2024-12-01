@@ -1264,10 +1264,10 @@ local function file_list(directory)
     return files
 end
 
-local function handle_file_completion(before_cur, path_pos)
+local function handle_file_completion(before_cur)
     local directory, last_component_pos =
-        before_cur:sub(path_pos):match('(.-)()[^' .. path_separator ..']*$')
-    completion_pos = path_pos + last_component_pos - 1
+        before_cur:sub(completion_pos):match('(.-)()[^' .. path_separator ..']*$')
+    completion_pos = completion_pos + last_component_pos - 1
 
     if directory:find('^~' .. path_separator) then
         local home = mp.command_native({'expand-path', '~/'})
@@ -1285,7 +1285,7 @@ local function handle_file_completion(before_cur, path_pos)
     return file_list(directory), before_cur
 end
 
-local function handle_choice_completion(option, before_cur, path_pos)
+local function handle_choice_completion(option, before_cur)
     local info = mp.get_property_native('option-info/' .. option, {})
 
     if info.type == 'Flag' then
@@ -1293,7 +1293,7 @@ local function handle_choice_completion(option, before_cur, path_pos)
     end
 
     if info['expects-file'] then
-        return handle_file_completion(before_cur, path_pos)
+        return handle_file_completion(before_cur)
     end
 
     -- Fix completing the empty value for --dscale and --cscale.
@@ -1302,6 +1302,72 @@ local function handle_choice_completion(option, before_cur, path_pos)
     end
 
     return info.choices, before_cur
+end
+
+local function command_flags_at_1st_argument_list(command)
+    local flags = {
+        ['playlist-next'] = {'weak', 'force'},
+        ['playlist-play-index'] = {'current'},
+        ['playlist-remove'] = {'current'},
+        ['rescan-external-files'] = {'reselect', 'keep-selection'},
+        ['revert-seek'] = {'mark', 'mark-permanent'},
+        ['screenshot'] = {'subtitles', 'video', 'window', 'each-frame'},
+        ['stop'] = {'keep-playlist'},
+    }
+    flags['playlist-prev'] = flags['playlist-next']
+    flags['screenshot-raw'] = flags.screenshot
+
+    return flags[command]
+end
+
+local function command_flags_at_2nd_argument_list(command)
+    local flags = {
+        ['apply-profile'] = {'default', 'restore'},
+        ['loadfile'] = {'replace', 'append', 'append-play', 'insert-next',
+                        'insert-next-play', 'insert-at', 'insert-at-play'},
+        ['screenshot-to-file'] = {'subtitles', 'video', 'window', 'each-frame'},
+        ['seek'] = {'relative', 'absolute', 'absolute-percent',
+                    'relative-percent', 'keyframes', 'exact'},
+        ['sub-add'] = {'select', 'auto', 'cached'},
+        ['sub-seek'] = {'primary', 'secondary'},
+    }
+    flags.loadlist = flags.loadfile
+    flags['audio-add'] = flags['sub-add']
+    flags['video-add'] = flags['sub-add']
+    flags['sub-step'] = flags['sub-seek']
+
+    return flags[command]
+end
+
+local function list_executables()
+    local executable_map = {}
+    local path = os.getenv('PATH') or ''
+    local separator = platform == 'windows' and ';' or ':'
+
+    for directory in path:gmatch('[^' .. separator .. ']+') do
+        for _, executable in pairs(utils.readdir(directory, 'files') or {}) do
+            executable_map[executable] = true
+        end
+    end
+
+    local executables = {}
+    for executable, _ in pairs(executable_map) do
+        executables[#executables + 1] = executable
+    end
+
+    return executables
+end
+
+local function list_filter_labels(type)
+    local values = {'all'}
+
+    for _, value in pairs(mp.get_property_native(type)) do
+        if value.label then
+            values[#values + 1] = value.label
+        end
+    end
+
+    return values
 end
 
 local function common_prefix_length(s1, s2)
@@ -1437,20 +1503,22 @@ complete = function ()
         return
     end
 
+    completion_pos = tokens[#tokens].pos
+
     local add_actions = {
         ['add'] = true, ['append'] = true, ['pre'] = true, ['set'] = true
     }
 
     local first_useful_token = tokens[first_useful_token_index]
 
-    completion_pos = before_cur:match('${[=>]?()[%w_/-]*$')
-    if completion_pos then
+    local property_pos = before_cur:match('${[=>]?()[%w_/-]*$')
+    if property_pos then
+        completion_pos = property_pos
         completions = property_list()
         completion_append = '}'
     elseif #tokens == first_useful_token_index then
         completions = command_list()
         completions[#completions + 1] = 'help'
-        completion_pos = first_useful_token.pos
     elseif #tokens == first_useful_token_index + 1 then
         if first_useful_token.text == 'set' or
            first_useful_token.text == 'add' or
@@ -1458,66 +1526,58 @@ complete = function ()
            first_useful_token.text == 'cycle-values' or
            first_useful_token.text == 'multiply' then
             completions = property_list()
-            completion_pos = tokens[first_useful_token_index + 1].pos
         elseif first_useful_token.text == 'help' then
             completions = command_list()
-            completion_pos = tokens[first_useful_token_index + 1].pos
         elseif first_useful_token.text == 'apply-profile' then
             completions = profile_list()
-            completion_pos = tokens[first_useful_token_index + 1].pos
         elseif first_useful_token.text == 'change-list' then
             completions = list_option_list()
-            completion_pos = tokens[first_useful_token_index + 1].pos
+        elseif first_useful_token.text == 'run' then
+            completions = list_executables()
         elseif first_useful_token.text == 'vf' or
                first_useful_token.text == 'af' then
             completions = list_option_action_list(first_useful_token.text)
-            completion_pos = tokens[first_useful_token_index + 1].pos
+        elseif first_useful_token.text == 'vf-command' or
+               first_useful_token.text == 'af-command' then
+            completions = list_filter_labels(first_useful_token.text:sub(1,2))
         elseif has_file_argument(first_useful_token.text) then
-            completions, before_cur =
-                handle_file_completion(before_cur, tokens[first_useful_token_index + 1].pos)
+            completions, before_cur = handle_file_completion(before_cur)
+        else
+            completions = command_flags_at_1st_argument_list(first_useful_token.text)
         end
     elseif first_useful_token.text == 'cycle-values' then
-        completion_pos = tokens[#tokens].pos
         completions, before_cur =
             handle_choice_completion(tokens[first_useful_token_index + 1].text,
-                                     before_cur, tokens[#tokens].pos)
+                                     before_cur)
     elseif #tokens == first_useful_token_index + 2 then
         if first_useful_token.text == 'set' then
-            completion_pos = tokens[#tokens].pos
             completions, before_cur =
                 handle_choice_completion(tokens[first_useful_token_index + 1].text,
-                                         before_cur,
-                                         tokens[first_useful_token_index + 2].pos)
+                                         before_cur)
         elseif first_useful_token.text == 'change-list' then
             completions = list_option_action_list(tokens[first_useful_token_index + 1].text)
-            completion_pos = tokens[first_useful_token_index + 2].pos
         elseif first_useful_token.text == 'vf' or
                first_useful_token.text == 'af' then
             if add_actions[tokens[first_useful_token_index + 1].text] then
-                completion_pos = tokens[#tokens].pos
                 completions, before_cur =
-                    handle_choice_completion(first_useful_token.text,
-                                             before_cur, tokens[#tokens].pos)
+                    handle_choice_completion(first_useful_token.text, before_cur)
             elseif tokens[first_useful_token_index + 1].text == 'remove' then
                 completions = list_option_value_list(first_useful_token.text)
-                completion_pos = tokens[#tokens].pos
             end
+        else
+            completions = command_flags_at_2nd_argument_list(first_useful_token.text)
         end
     elseif #tokens == first_useful_token_index + 3 then
         if first_useful_token.text == 'change-list' then
             if add_actions[tokens[first_useful_token_index + 2].text] then
-                completion_pos = tokens[#tokens].pos
                 completions, before_cur =
                     handle_choice_completion(tokens[first_useful_token_index + 1].text,
-                                             before_cur, tokens[#tokens].pos)
+                                             before_cur)
             elseif tokens[first_useful_token_index + 2].text == 'remove' then
-                completion_pos = tokens[#tokens].pos
                 completions = list_option_value_list(tokens[first_useful_token_index + 1].text)
             end
         elseif first_useful_token.text == 'dump-cache' then
-            completions, before_cur =
-                handle_file_completion(before_cur,
-                                       tokens[first_useful_token_index + 3].pos)
+            completions, before_cur = handle_file_completion(before_cur)
         end
     end
 
