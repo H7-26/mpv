@@ -32,6 +32,8 @@ local opts = {
     font = "",
     font_size = 24,
     border_size = 1.65,
+    margin_x = -1,
+    margin_y = -1,
     scale_with_window = "auto",
     case_sensitive = platform ~= 'windows' and true or false,
     history_dedup = true,
@@ -126,6 +128,15 @@ local function get_font()
     end
 
     return 'monospace'
+end
+
+local function get_margin_x()
+    return opts.margin_x > -1 and opts.margin_x or mp.get_property_native('osd-margin-x')
+end
+
+
+local function get_margin_y()
+    return opts.margin_y > -1 and opts.margin_y or mp.get_property_native('osd-margin-y')
 end
 
 
@@ -276,7 +287,7 @@ local function calculate_max_log_lines()
 
     return math.floor((select(2, get_scaled_osd_dimensions())
                        * (1 - global_margins.t - global_margins.b)
-                       - mp.get_property_native('osd-margin-y'))
+                       - get_margin_y())
                       / opts.font_size
                       -- Subtract 1 for the input line and 0.5 for the empty
                       -- line between the log and the input line.
@@ -524,8 +535,8 @@ local function update()
 
     local screenx, screeny = get_scaled_osd_dimensions()
 
-    local marginx = mp.get_property_native('osd-margin-x')
-    local marginy = mp.get_property_native('osd-margin-y')
+    local marginx = get_margin_x()
+    local marginy = get_margin_y()
 
     local coordinate_top = math.floor(global_margins.t * screeny + 0.5)
     local clipping_coordinates = '0,' .. coordinate_top .. ',' ..
@@ -567,8 +578,9 @@ local function update()
         -- Even with bottom-left anchoring,
         -- libass/ass_render.c:ass_render_event() subtracts --osd-margin-x from
         -- the maximum text width twice.
-        local width_max = math.floor((screenx - marginx - marginx * 2 / scale_factor())
-                                     / opts.font_size * get_font_hw_ratio())
+        local width_max = math.floor(
+            (screenx - marginx - mp.get_property_native('osd-margin-x') * 2 / scale_factor())
+            / opts.font_size * get_font_hw_ratio())
 
         local suggestions, rows = format_table(suggestion_buffer, width_max, lines_max)
         lines_max = lines_max - rows
@@ -854,7 +866,7 @@ local function determine_hovered_item()
     local height = select(2, get_scaled_osd_dimensions())
     local y = mp.get_property_native('mouse-pos').y / scale_factor()
     local log_bottom_pos = height * (1 - global_margins.b)
-                           - mp.get_property_native('osd-margin-y')
+                           - get_margin_y()
                            - 1.5 * opts.font_size
 
     if y > log_bottom_pos then
@@ -1003,20 +1015,15 @@ local function search_history()
     end
 
     searching_history = true
+    suggestion_buffer = {}
     selectable_items = {}
-    matches = {}
-    selected_match = 1
     first_match_to_print = 1
 
     for i = 1, #history do
         selectable_items[i] = history[#history + 1 - i]
     end
 
-    for i, match in ipairs(fuzzy_find(line, selectable_items)) do
-        matches[i] = { index = match, text = selectable_items[match] }
-    end
-
-    update()
+    handle_edit()
     bind_mouse()
 end
 
@@ -1811,8 +1818,7 @@ mp.register_script_message('get-input', function (script_name, args)
         for i, item in ipairs(args.items) do
             selectable_items[i] = item:gsub("[\r\n].*", "⋯"):sub(1, 300)
         end
-
-        matches = {}
+        handle_edit()
         selected_match = args.default_item or 1
         default_item = args.default_item
 
@@ -1822,9 +1828,6 @@ mp.register_script_message('get-input', function (script_name, args)
             first_match_to_print = math.max(1, #selectable_items - max_lines + 1)
         end
 
-        for i, item in ipairs(selectable_items) do
-            matches[i] = { index = i, text = item }
-        end
         bind_mouse()
     end
 
