@@ -31,17 +31,17 @@ The Interface
 pl prev
     =============   ================================================
     left-click      play previous file in playlist
-    right-click     show the playlist
     shift+L-click   show the playlist
     middle-click    show the playlist
+    right-click     open the playlist selector
     =============   ================================================
 
 pl next
     =============   ================================================
     left-click      play next file in playlist
-    right-click     show the playlist
     shift+L-click   show the playlist
     middle-click    show the playlist
+    right-click     open the playlist selector
     =============   ================================================
 
 title
@@ -50,8 +50,9 @@ title
 
     =============   ================================================
     left-click      show file and track info
+    shift+L-click   show the filename
     middle-click    show the filename
-    right-click     open the playlist selector
+    right-click     show the path
     =============   ================================================
 
 cache
@@ -66,15 +67,17 @@ play
 skip back
     =============   ================================================
     left-click      go to beginning of chapter / previous chapter
-    right-click     open the chapter selector
     shift+L-click   show chapters
+    middle-click    show chapters
+    right-click     open the chapter selector
     =============   ================================================
 
 skip frwd
     =============   ================================================
     left-click      go to next chapter
-    right-click     open the chapter selector
     shift+L-click   show chapters
+    middle-click    show chapters
+    right-click     open the chapter selector
     =============   ================================================
 
 time elapsed
@@ -505,19 +508,19 @@ clicked. ``mbtn_mid`` commands are also triggered with ``shift+mbtn_left``.
 
 ``playlist_prev_mbtn_mid_command=show-text ${playlist} 3000``
 
-``playlist_prev_mbtn_right_command=show-text ${playlist} 3000``
+``playlist_prev_mbtn_right_command=script-binding select/select-playlist; script-message-to osc osc-hide``
 
 ``playlist_next_mbtn_left_command=playlist-next; show-text ${playlist} 3000``
 
 ``playlist_next_mbtn_mid_command=show-text ${playlist} 3000``
 
-``playlist_next_mbtn_right_command=show-text ${playlist} 3000``
+``playlist_next_mbtn_right_command=script-binding select/select-playlist; script-message-to osc osc-hide``
 
 ``title_mbtn_left_command=script-binding stats/display-page-5``
 
 ``title_mbtn_mid_command=show-text ${filename}``
 
-``title_mbtn_right_command=script-binding select/select-playlist; script-message-to osc osc-hide``
+``title_mbtn_right_command=show-text ${path}``
 
 ``play_pause_mbtn_left_command=cycle pause``
 
