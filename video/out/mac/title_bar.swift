@@ -92,41 +92,41 @@ class TitleBar: NSVisualEffectView {
     }
 
     func set(appearance: Int32) {
-        window?.appearance = { switch appearance {
-            case 1: return NSAppearance(named: .aqua)
-            case 2: return NSAppearance(named: .darkAqua)
-            case 3: return NSAppearance(named: .vibrantLight)
-            case 4: return NSAppearance(named: .vibrantDark)
-            case 5: return NSAppearance(named: .accessibilityHighContrastAqua)
-            case 6: return NSAppearance(named: .accessibilityHighContrastDarkAqua)
-            case 7: return NSAppearance(named: .accessibilityHighContrastVibrantLight)
-            case 8: return NSAppearance(named: .accessibilityHighContrastVibrantDark)
-            case 0: return nil
+        window?.appearance = { switch Int(appearance) {
+            case MAC_APPEAR_AQUA: return NSAppearance(named: .aqua)
+            case MAC_APPEAR_DARK_AQUA: return NSAppearance(named: .darkAqua)
+            case MAC_APPEAR_VIBRANT_LIGHT: return NSAppearance(named: .vibrantLight)
+            case MAC_APPEAR_VIBRANT_DARK: return NSAppearance(named: .vibrantDark)
+            case MAC_APPEAR_AQUA_HC: return NSAppearance(named: .accessibilityHighContrastAqua)
+            case MAC_APPEAR_DARK_AQUA_HC: return NSAppearance(named: .accessibilityHighContrastDarkAqua)
+            case MAC_APPEAR_VIBRANT_LIGHT_HC: return NSAppearance(named: .accessibilityHighContrastVibrantLight)
+            case MAC_APPEAR_VIBRANT_DARK_HC: return NSAppearance(named: .accessibilityHighContrastVibrantDark)
+            case MAC_APPEAR_AUTO: return nil
             default: return nil
             }
         }()
     }
 
     func set(material: Int32) {
-        self.material = { switch material {
-            case 0: return .titlebar
-            case 1: return .selection
-            case 2: return .menu
-            case 3: return .popover
-            case 4: return .sidebar
-            case 5: return .headerView
-            case 6: return .sheet
-            case 7: return .windowBackground
-            case 8: return .hudWindow
-            case 9: return .fullScreenUI
-            case 10: return .toolTip
-            case 11: return .contentBackground
-            case 12: return .underWindowBackground
-            case 13: return .underPageBackground
-            case 14: return .dark
-            case 15: return .light
-            case 16: return .mediumLight
-            case 17: return .ultraDark
+        self.material = { switch Int(material) {
+            case MAC_MAT_TITLEBAR: return .titlebar
+            case MAC_MAT_SELECTION: return .selection
+            case MAC_MAT_MENU: return .menu
+            case MAC_MAT_POPOVER: return .popover
+            case MAC_MAT_SIDEBAR: return .sidebar
+            case MAC_MAT_HEADER_VIEW: return .headerView
+            case MAC_MAT_SHEET: return .sheet
+            case MAC_MAT_WINDOW_BACKGROUND: return .windowBackground
+            case MAC_MAT_HUD_WINDOW: return .hudWindow
+            case MAC_MAT_FULL_SCREEN: return .fullScreenUI
+            case MAC_MAT_TOOL_TIP: return .toolTip
+            case MAC_MAT_CONTENT_BACKGROUND: return .contentBackground
+            case MAC_MAT_UNDER_WINDOW_BACKGROUND: return .underWindowBackground
+            case MAC_MAT_UNDER_PAGE_BACKGROUND: return .underPageBackground
+            case MAC_MAT_DARK: return .dark
+            case MAC_MAT_LIGHT: return .light
+            case MAC_MAT_MEDIUM_LIGHT: return .mediumLight
+            case MAC_MAT_ULTRA_DARK: return .ultraDark
             default: return .titlebar
             }
         }()
