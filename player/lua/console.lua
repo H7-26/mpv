@@ -58,7 +58,7 @@ local styles = {
     disabled = '{\\1c&Hcccccc&}',
 }
 for key, style in pairs(styles) do
-    styles[key] = style .. '{\\1a&H00&\\3c&H111111&\\3a&H00&}'
+    styles[key] = style .. '{\\3c&H111111&}'
 end
 
 local terminal_styles = {
@@ -1178,6 +1178,10 @@ local function property_list()
 
     for _, sub_property in pairs({'video', 'audio', 'sub', 'sub2'}) do
         properties[#properties + 1] = 'current-tracks/' .. sub_property
+    end
+
+    for _, sub_property in pairs({'text'}) do
+        properties[#properties + 1] = 'clipboard/' .. sub_property
     end
 
     return properties
