@@ -549,10 +549,8 @@ local function update()
     local clipping_coordinates = '0,' .. coordinate_top .. ',' ..
                                  osd_w .. ',' .. osd_h
     local ass = assdraw.ass_new()
-    local has_shadow = mp.get_property('osd-border-style'):find('box$') == nil
     local font = get_font()
     local style = '{\\r' ..
-                  (has_shadow and '\\4a&H99&\\4c&H000000&\\xshad0\\yshad1' or '') ..
                   (font and '\\fn' .. font or '') ..
                   '\\fs' .. opts.font_size ..
                   '\\bord' .. opts.border_size .. '\\fsp0' ..
@@ -563,11 +561,12 @@ local function update()
     -- of the drawing. So the cursor doesn't affect layout too much, make it as
     -- thin as possible and make it appear to be 1px wide by giving it 0.5px
     -- horizontal borders.
+    local color, alpha = mpv_color_to_ass(mp.get_property('osd-color'))
     local cheight = opts.font_size * 8
-    local cglyph = '{\\rDefault' ..
+    local cglyph = '{\\r\\blur0' ..
                    (mp.get_property_native('focused') == false
-                    and '\\alpha&HFF&' or '\\1a&H44&\\3a&H44&\\4a&H99&') ..
-                   '\\1c&Heeeeee&\\3c&Heeeeee&\\4c&H000000&' ..
+                    and '\\alpha&HFF&' or '\\3a&H' .. alpha .. '&') ..
+                   '\\3c&H' .. color .. '&' ..
                    '\\xbord0.5\\ybord0\\xshad0\\yshad1\\p4\\pbo24}' ..
                    'm 0 0 l 1 0 l 1 ' .. cheight .. ' l 0 ' .. cheight ..
                    '{\\p0}'
