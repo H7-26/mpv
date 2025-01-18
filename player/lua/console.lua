@@ -547,8 +547,8 @@ local function update()
 
     local osd_w, osd_h = get_scaled_osd_dimensions()
 
-    local margin_x = get_margin_x()
-    local margin_y = get_margin_y()
+    local x = get_margin_x()
+    local y = osd_h * (1 - global_margins.b) - get_margin_y()
 
     local coordinate_top = math.floor(global_margins.t * osd_h + 0.5)
     local clipping_coordinates = '0,' .. coordinate_top .. ',' ..
@@ -581,7 +581,7 @@ local function update()
     -- Render log messages as ASS.
     -- This will render at most screeny / font_size - 1 messages.
 
-    local lines_max = calculate_max_log_lines()
+    local max_lines = calculate_max_log_lines()
     local suggestion_ass = ''
     if next(suggestion_buffer) then
         -- Estimate how many characters fit in one line
@@ -589,11 +589,11 @@ local function update()
         -- libass/ass_render.c:ass_render_event() subtracts --osd-margin-x from
         -- the maximum text width twice.
         local width_max = math.floor(
-            (osd_w - margin_x - mp.get_property_native('osd-margin-x') * 2 / scale_factor())
+            (osd_w - x - mp.get_property_native('osd-margin-x') * 2 / scale_factor())
             / opts.font_size * get_font_hw_ratio())
 
-        local suggestions, rows = format_table(suggestion_buffer, width_max, lines_max)
-        lines_max = lines_max - rows
+        local suggestions, rows = format_table(suggestion_buffer, width_max, max_lines)
+        max_lines = max_lines - rows
         suggestion_ass = style .. styles.suggestion .. suggestions .. '\\N'
     end
 
@@ -601,19 +601,29 @@ local function update()
 
     local log_ass = ''
     local log_buffer = log_buffers[id]
-    local log_messages = #log_buffer
-    local log_max_lines = math.max(0, lines_max)
-    if log_max_lines < log_messages then
-        log_messages = log_max_lines
-    end
-    for i = #log_buffer - log_messages + 1, #log_buffer do
-        log_ass = log_ass .. style .. log_buffer[i].style ..
-                  ass_escape(log_buffer[i].text) .. '\\N'
+    local box = mp.get_property('osd-border-style') == 'background-box'
+
+    for i = #log_buffer - math.min(max_lines, #log_buffer) + 1, #log_buffer do
+        local log_item = style .. log_buffer[i].style .. ass_escape(log_buffer[i].text)
+
+        -- Put every selectable item in its own event to prevent libass from
+        -- drawing them taller than opts.font_size with taller fonts, which
+        -- makes the hovered item calculation inaccurate and clips the counter.
+        -- But not with background-box, because it makes it look bad by
+        -- overlapping the semitransparent backgrounds of every line.
+        if selectable_items and not box then
+            ass:new_event()
+            ass:an(1)
+            ass:pos(x, y - (1.5 + #log_buffer - i) * opts.font_size)
+            ass:append(log_item)
+        else
+            log_ass = log_ass .. log_item .. '\\N'
+        end
     end
 
     ass:new_event()
     ass:an(1)
-    ass:pos(margin_x, osd_h - margin_y - global_margins.b * osd_h)
+    ass:pos(x, y)
     ass:append(log_ass .. '\\N')
     ass:append(suggestion_ass)
     ass:append(style .. ass_escape(prompt) .. ' ' .. before_cur)
@@ -624,7 +634,7 @@ local function update()
     -- cursor appear in front of the text.
     ass:new_event()
     ass:an(1)
-    ass:pos(margin_x, osd_h - margin_y - global_margins.b * osd_h)
+    ass:pos(x, y)
     ass:append(style .. '{\\alpha&HFF&}' .. ass_escape(prompt) .. ' ' .. before_cur)
     ass:append(cglyph)
     ass:append(style .. '{\\alpha&HFF&}' .. after_cur)
