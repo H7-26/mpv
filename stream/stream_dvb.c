@@ -53,6 +53,7 @@
 #include "options/m_option.h"
 #include "options/options.h"
 #include "options/path.h"
+#include "osdep/poll_wrapper.h"
 #include "osdep/threads.h"
 
 #include "dvbin.h"
@@ -73,7 +74,7 @@ const struct m_sub_options stream_dvb_conf = {
     .opts = (const m_option_t[]) {
         {"prog", OPT_STRING(cfg_prog), .flags = UPDATE_DVB_PROG},
         {"card", OPT_INT(cfg_devno), M_RANGE(0, MAX_ADAPTERS-1)},
-        {"timeout", OPT_INT(cfg_timeout), M_RANGE(1, 30)},
+        {"timeout", OPT_FLOAT(cfg_timeout), M_RANGE(0, FLT_MAX)},
         {"file", OPT_STRING(cfg_file), .flags = M_OPT_FILE},
         {"full-transponder", OPT_BOOL(cfg_full_transponder)},
         {"channel-switch-offset", OPT_INT(cfg_channel_switch_offset),
@@ -678,7 +679,7 @@ static int dvb_streaming_read(stream_t *stream, void *buffer, int size)
             if (pos || tries == 0)
                 break;
             tries--;
-            if (poll(pfds, 1, 2000) <= 0) {
+            if (mp_poll(pfds, 1, MP_TIME_S_TO_NS(2)) <= 0) {
                 MP_ERR(stream, "dvb_streaming_read: failed with "
                         "errno %d when reading %d bytes\n", errno, size - pos);
                 errno = 0;

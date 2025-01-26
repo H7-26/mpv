@@ -35,6 +35,7 @@
 
 #include "common/common.h"
 #include "osdep/io.h"
+#include "osdep/poll_wrapper.h"
 #include "osdep/timer.h"
 #include "dvbin.h"
 #include "dvb_tune.h"
@@ -277,7 +278,7 @@ static void print_status(dvb_priv_t *priv, fe_status_t festatus)
     MP_VERBOSE(priv, "\n");
 }
 
-static int check_status(dvb_priv_t *priv, int fd_frontend, int tmout)
+static int check_status(dvb_priv_t *priv, int fd_frontend, float tmout)
 {
     fe_status_t festatus;
     bool ok = false;
@@ -291,7 +292,7 @@ static int check_status(dvb_priv_t *priv, int fd_frontend, int tmout)
     int tm1 = (int)mp_time_sec();
     while (!ok) {
         festatus = 0;
-        if (poll(pfd, 1, tmout * 1000) > 0) {
+        if (mp_poll(pfd, 1, MP_TIME_S_TO_NS(tmout)) > 0) {
             if (pfd[0].revents & POLLPRI) {
                 if (ioctl(fd_frontend, FE_READ_STATUS, &festatus) >= 0) {
                     if (festatus & FE_HAS_LOCK)
@@ -307,7 +308,7 @@ static int check_status(dvb_priv_t *priv, int fd_frontend, int tmout)
 
     if (!(festatus & FE_HAS_LOCK)) {
         MP_ERR(priv, "Not able to lock to the signal on the given frequency, "
-               "timeout: %d\n", tmout);
+               "timeout: %g\n", tmout);
         return -1;
     }
 
@@ -402,7 +403,7 @@ static int tune_it(dvb_priv_t *priv, int fd_frontend, unsigned int delsys,
                    fe_guard_interval_t guardInterval,
                    fe_bandwidth_t bandwidth,
                    fe_code_rate_t LP_CodeRate, fe_hierarchy_t hier,
-                   int timeout)
+                   float timeout)
 {
     dvb_state_t *state = priv->state;
 
@@ -633,7 +634,7 @@ int dvb_tune(dvb_priv_t *priv, unsigned int delsys,
              fe_transmit_mode_t TransmissionMode, fe_bandwidth_t bandWidth,
              fe_code_rate_t HP_CodeRate,
              fe_code_rate_t LP_CodeRate, fe_hierarchy_t hier,
-             int timeout)
+             float timeout)
 {
     MP_INFO(priv, "Tuning to %s frequency %lu Hz\n",
             get_dvb_delsys(delsys), (long unsigned int) freq);
