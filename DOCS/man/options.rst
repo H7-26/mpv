@@ -1148,6 +1148,26 @@ Watch Later
     Ignore path (i.e. use filename only) when using watch later feature.
     (Default: disabled)
 
+Watch History
+-------------
+
+``--save-watch-history``
+    Whether to save which files are played. These can be then selected with the
+    default ``g-h`` key binding.
+
+    .. warning::
+
+        This option may expose privacy-sensitive information and is thus
+        disabled by default.
+
+``--watch-history-path=<path>``
+    The path in which to store the watch history. Default:
+    ``~~state/watch_history.jsonl`` (see `PATHS`_).
+
+    This file contains one JSON object per line. Its ``time`` field is the UNIX
+    timestamp when the file was opened, its ``path`` field is the normalized
+    path, and its ``title`` field is the title when it was available.
+
 Video
 -----
 
@@ -7871,10 +7891,14 @@ Miscellaneous
     writing to the ``clipboard`` property to get and set clipboard contents.
 
 ``--clipboard-monitor=<yes|no>``
-    (Windows and macOS only)
+    (Windows, Wayland and macOS only)
 
     Enable clipboard monitoring so that the ``clipboard`` property can be
     observed for content changes (default: no). This only affects clipboard
     implementations which use polling to monitor clipboard updates.
     Other platforms currently ignore this option and always/never notify
     changes.
+
+    On Wayland, this option only has effect on the ``wayland`` backend, and
+    not for the ``vo`` backend. See ``current-clipboard-backend`` property for
+    more details.

@@ -577,32 +577,11 @@ static int mp_property_file_size(void *ctx, struct m_property *prop,
     return m_property_int64_ro(action, arg, size);
 }
 
-static const char *find_non_filename_media_title(MPContext *mpctx)
-{
-    const char *name = mpctx->opts->media_title;
-    if (name && name[0])
-        return name;
-    if (mpctx->demuxer) {
-        name = mp_tags_get_str(mpctx->demuxer->metadata, "service_name");
-        if (name && name[0])
-            return name;
-        name = mp_tags_get_str(mpctx->demuxer->metadata, "title");
-        if (name && name[0])
-            return name;
-        name = mp_tags_get_str(mpctx->demuxer->metadata, "icy-title");
-        if (name && name[0])
-            return name;
-    }
-    if (mpctx->playing && mpctx->playing->title)
-        return mpctx->playing->title;
-    return NULL;
-}
-
 static int mp_property_media_title(void *ctx, struct m_property *prop,
                                    int action, void *arg)
 {
     MPContext *mpctx = ctx;
-    const char *name = find_non_filename_media_title(mpctx);
+    const char *name = mp_find_non_filename_media_title(mpctx);
     if (name && name[0])
         return m_property_strdup_ro(action, arg, name);
     return mp_property_filename(ctx, prop, action, arg);
@@ -4104,6 +4083,13 @@ static int mp_property_udata(void *ctx, struct m_property *prop,
     return ret;
 }
 
+static int mp_property_current_clipboard_backend(void *ctx, struct m_property *p,
+                                                 int action, void *arg)
+{
+    MPContext *mpctx = ctx;
+    return m_property_strdup_ro(action, arg, mp_clipboard_get_backend_name(mpctx->clipboard));
+}
+
 static int get_clipboard(struct MPContext *mpctx, void *arg,
                          struct clipboard_access_params *params)
 {
@@ -4171,6 +4157,12 @@ static int mp_property_clipboard(void *ctx, struct m_property *prop,
             node_map_add_string(&node, "text", data);
             talloc_free(data);
         }
+        params.target = CLIPBOARD_TARGET_PRIMARY_SELECTION;
+        data = NULL;
+        if (get_clipboard(mpctx, &data, &params) == M_PROPERTY_OK) {
+            node_map_add_string(&node, "text-primary", data);
+            talloc_free(data);
+        }
         *(struct mpv_node *)arg = node;
         return M_PROPERTY_OK;
     }
@@ -4178,7 +4170,9 @@ static int mp_property_clipboard(void *ctx, struct m_property *prop,
         struct m_property_action_arg *act = arg;
         const char *key = act->key;
 
-        if (strcmp(key, "text"))
+        if (!strcmp(key, "text-primary"))
+            params.target = CLIPBOARD_TARGET_PRIMARY_SELECTION;
+        else if (strcmp(key, "text"))
             return M_PROPERTY_UNKNOWN;
 
         switch (act->action) {
@@ -4423,6 +4417,7 @@ static const struct m_property mp_properties_base[] = {
     {"term-size", mp_property_term_size},
 
     {"clipboard", mp_property_clipboard},
+    {"current-clipboard-backend", mp_property_current_clipboard_backend},
 
     M_PROPERTY_ALIAS("video", "vid"),
     M_PROPERTY_ALIAS("audio", "aid"),
@@ -7556,7 +7551,7 @@ static void command_event(struct MPContext *mpctx, int event, void *arg)
     if (event == MP_EVENT_METADATA_UPDATE) {
         struct playlist_entry *const pe = mpctx->playing;
         if (pe && !pe->title) {
-            const char *const name = find_non_filename_media_title(mpctx);
+            const char *const name = mp_find_non_filename_media_title(mpctx);
             if (name && name[0]) {
                 pe->title = talloc_strdup(pe, name);
                 mp_notify_property(mpctx, "playlist");
