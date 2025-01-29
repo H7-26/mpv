@@ -5688,7 +5688,10 @@ static void cmd_frame_step(void *p)
         return;
     }
 
-    if (frames > 0 && !flags && cmd->cmd->is_up_down) {
+    if (flags) {
+        if (!cmd->cmd->is_up)
+            add_step_frame(mpctx, frames, flags);
+    } else {
         if (cmd->cmd->is_up) {
             if (mpctx->step_frames < 1)
                 set_pause_state(mpctx, true);
@@ -5699,8 +5702,6 @@ static void cmd_frame_step(void *p)
                 add_step_frame(mpctx, frames, flags);
             }
         }
-    } else {
-        add_step_frame(mpctx, frames, flags);
     }
 }
 
@@ -7747,12 +7748,12 @@ void mp_option_change_callback(void *ctx, struct m_config_option *co, int flags,
     if (flags & UPDATE_DEMUXER)
         mpctx->demuxer_changed = true;
 
-    if (flags & UPDATE_AD) {
+    if (flags & UPDATE_AD && mpctx->ao_chain) {
         uninit_audio_chain(mpctx);
         reinit_audio_chain(mpctx);
     }
 
-    if (flags & UPDATE_VD) {
+    if (flags & UPDATE_VD && mpctx->vo_chain) {
         struct track *track = mpctx->current_track[0][STREAM_VIDEO];
         uninit_video_chain(mpctx);
         reinit_video_chain(mpctx);
