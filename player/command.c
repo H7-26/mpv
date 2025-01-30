@@ -1934,8 +1934,8 @@ static struct track* track_next(struct MPContext *mpctx, enum stream_type type,
     return direction > 0 ? next : prev;
 }
 
-static int property_switch_track(void *ctx, struct m_property *prop,
-                                 int action, void *arg)
+static int mp_property_switch_track(void *ctx, struct m_property *prop,
+                                    int action, void *arg)
 {
     MPContext *mpctx = ctx;
     const int *def = prop->priv;
@@ -2003,6 +2003,13 @@ static int get_track_entry(int item, int action, void *arg, void *ctx)
     bool has_rg = track->stream && track->stream->codec->replaygain_data;
     struct replaygain_data rg = has_rg ? *track->stream->codec->replaygain_data
                                        : (struct replaygain_data){0};
+
+    struct mp_tags *tags = track->stream ? track->stream->tags : &(struct mp_tags){0};
+    char **tag_list = talloc_zero_array(NULL, char *, tags->num_keys * 2 + 1);
+    for (int i = 0; i < tags->num_keys; i++) {
+        tag_list[2 * i] = talloc_strdup(tag_list, tags->keys[i]);
+        tag_list[2 * i + 1] = talloc_strdup(tag_list, tags->values[i]);
+    }
 
     double par = 0.0;
     if (p.par_h)
@@ -2087,10 +2094,37 @@ static int get_track_entry(int item, int action, void *arg, void *ctx)
                         .unavailable = !p.dovi},
         {"dolby-vision-level", SUB_PROP_INT(p.dv_level),
                         .unavailable = !p.dovi},
+        {"metadata", SUB_PROP_KEYVALUE_LIST(tag_list),
+                        .unavailable = !tags->num_keys},
         {0}
     };
 
-    return m_property_read_sub(props, action, arg);
+    int ret = 0;
+    switch (action) {
+    case M_PROPERTY_KEY_ACTION: ;
+        struct m_property_action_arg *ka = arg;
+        if (!strncmp(ka->key, "metadata/", 9)) {
+            bstr key = {0};
+            char *rem = "";
+            m_property_split_path(ka->key, &key, &rem);
+            ka->key = !rem[0] ? "metadata" : rem;
+            if (rem[0]) {
+                if (!tags || tags->num_keys == 0) {
+                    ret = M_PROPERTY_UNAVAILABLE;
+                } else {
+                    ret = tag_property(action, (void *)ka, tags);
+                }
+                goto done;
+            }
+        }
+        MP_FALLTHROUGH;
+    default:
+        ret = m_property_read_sub(props, action, arg);
+    }
+
+done:
+    talloc_free(tag_list);
+    return ret;
 }
 
 static const char *track_type_name(struct track *t)
@@ -2115,8 +2149,8 @@ static char *append_track_info(char *res, struct track *track)
     return res;
 }
 
-static int property_list_tracks(void *ctx, struct m_property *prop,
-                                int action, void *arg)
+static int mp_property_list_tracks(void *ctx, struct m_property *prop,
+                                   int action, void *arg)
 {
     MPContext *mpctx = ctx;
     if (action == M_PROPERTY_PRINT) {
@@ -2196,8 +2230,8 @@ static int property_list_tracks(void *ctx, struct m_property *prop,
                                 get_track_entry, mpctx);
 }
 
-static int property_current_tracks(void *ctx, struct m_property *prop,
-                                   int action, void *arg)
+static int mp_property_current_tracks(void *ctx, struct m_property *prop,
+                                      int action, void *arg)
 {
     MPContext *mpctx = ctx;
 
@@ -4275,8 +4309,8 @@ static const struct m_property mp_properties_base[] = {
     {"window-id", mp_property_window_id},
 
     {"chapter-list", mp_property_list_chapters},
-    {"track-list", property_list_tracks},
-    {"current-tracks", property_current_tracks},
+    {"track-list", mp_property_list_tracks},
+    {"current-tracks", mp_property_current_tracks},
     {"edition-list", property_list_editions},
 
     {"playlist", mp_property_playlist},
@@ -4298,7 +4332,7 @@ static const struct m_property mp_properties_base[] = {
     M_PROPERTY_ALIAS("audio-codec", "current-tracks/audio/codec-desc"),
     {"audio-params", mp_property_audio_params},
     {"audio-out-params", mp_property_audio_out_params},
-    {"aid", property_switch_track, .priv = (void *)(const int[]){0, STREAM_AUDIO}},
+    {"aid", mp_property_switch_track, .priv = (void *)(const int[]){0, STREAM_AUDIO}},
     {"audio-device", mp_property_audio_device},
     {"audio-device-list", mp_property_audio_devices},
     {"current-ao", mp_property_ao},
@@ -4324,7 +4358,7 @@ static const struct m_property mp_properties_base[] = {
     {"container-fps", mp_property_fps},
     {"estimated-vf-fps", mp_property_vf_fps},
     {"video-aspect-override", mp_property_video_aspect_override},
-    {"vid", property_switch_track, .priv = (void *)(const int[]){0, STREAM_VIDEO}},
+    {"vid", mp_property_switch_track, .priv = (void *)(const int[]){0, STREAM_VIDEO}},
     {"hwdec-current", mp_property_hwdec_current},
     {"hwdec-interop", mp_property_hwdec_interop},
 
@@ -4345,8 +4379,8 @@ static const struct m_property mp_properties_base[] = {
     {"touch-pos", mp_property_touch_pos},
 
     // Subs
-    {"sid", property_switch_track, .priv = (void *)(const int[]){0, STREAM_SUB}},
-    {"secondary-sid", property_switch_track,
+    {"sid", mp_property_switch_track, .priv = (void *)(const int[]){0, STREAM_SUB}},
+    {"secondary-sid", mp_property_switch_track,
         .priv = (void *)(const int[]){1, STREAM_SUB}},
     {"sub-delay", mp_property_sub_delay, .priv = (void *)&(const int){0}},
     {"secondary-sub-delay", mp_property_sub_delay,
