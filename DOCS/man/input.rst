@@ -1754,8 +1754,8 @@ This list uses the event name field value, and the C API symbol in brackets:
     Start of playback after seek or after file was loaded.
 
 ``shutdown`` (``MPV_EVENT_SHUTDOWN``)
-    Sent when the player quits, and the script should terminate. Normally
-    handled automatically. See `Details on the script initialization and lifecycle`_.
+    Sent when the player quits or when a script terminates. Normally handled
+    automatically. See `Details on the script initialization and lifecycle`_.
 
 ``log-message`` (``MPV_EVENT_LOG_MESSAGE``)
     Receives messages enabled with ``mpv_request_log_messages()`` (Lua:
@@ -3698,6 +3698,16 @@ Property list
     The player itself does not use any data in it (although some builtin scripts may).
     The property is not preserved across player restarts.
 
+    Sub-paths can be accessed directly; e.g. ``user-data/my-script/state/a`` can be
+    read, written, or observed.
+
+    The top-level object itself cannot be written directly; write to sub-paths instead.
+
+    Converting this property or its sub-properties to strings will give a JSON
+    representation. If converting a leaf-level object (i.e. not a map or array)
+    and not using raw mode, the underlying content will be given (e.g. strings will be
+    printed directly, rather than quoted and JSON-escaped).
+
     The following sub-paths are reserved for internal uses or have special semantics:
     ``user-data/osc``, ``user-data/mpv``. Unless noted otherwise, the semantics of
     any properties under these sub-paths can change at any time and may not be relied
@@ -3712,16 +3722,6 @@ Property list
         the left, right, top, and bottom margins respectively.
         Values are between 0.0 and 1.0, normalized to window width/height.
 
-    Sub-paths can be accessed directly; e.g. ``user-data/my-script/state/a`` can be
-    read, written, or observed.
-
-    The top-level object itself cannot be written directly; write to sub-paths instead.
-
-    Converting this property or its sub-properties to strings will give a JSON
-    representation. If converting a leaf-level object (i.e. not a map or array)
-    and not using raw mode, the underlying content will be given (e.g. strings will be
-    printed directly, rather than quoted and JSON-escaped).
-
     ``user-data/mpv/ytdl``
         Data shared by the builtin ytdl hook script.
 
@@ -3734,6 +3734,9 @@ Property list
             Result of executing ytdl to retrieve the JSON data of the URL being
             loaded. The format is the same as ``subprocess``'s result, capturing
             stdout and stderr.
+
+    ``user-data/mpv/console/open``
+        Whether the console is open.
 
 ``menu-data`` (RW)
     This property stores the raw menu definition. See `Context Menu`_ section for details.

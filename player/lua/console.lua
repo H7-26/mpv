@@ -38,7 +38,6 @@ local opts = {
     case_sensitive = platform ~= 'windows' and true or false,
     history_dedup = true,
     font_hw_ratio = 'auto',
-    pause_on_open = false,
 }
 
 local styles = {
@@ -91,7 +90,6 @@ local key_bindings = {}
 local dont_bind_up_down = false
 local overlay = mp.create_osd_overlay('ass-events')
 local global_margins = { t = 0, b = 0 }
-local was_playing = true
 local input_caller
 
 local completion_buffer = {}
@@ -1764,22 +1762,14 @@ local function undefine_key_bindings()
     key_bindings = {}
 end
 
-local function pause_playback()
-    was_playing = not mp.get_property_native('pause')
-
-    if opts.pause_on_open and was_playing then
-        mp.set_property_native('pause', true)
-    end
-end
-
 -- Set the REPL visibility ("enable", Esc)
 set_active = function (active)
     if active == repl_active then return end
     if active then
         repl_active = true
         insert_mode = false
-        pause_playback()
         define_key_bindings()
+        mp.set_property_bool('user-data/mpv/console/open', true)
 
         if not input_caller then
             prompt = default_prompt
@@ -1796,14 +1786,11 @@ set_active = function (active)
         log_buffers[id] = {}
         unbind_mouse()
     else
-        if opts.pause_on_open and was_playing then
-            mp.set_property_native('pause', false)
-        end
-
         repl_active = false
         completion_buffer = {}
         undefine_key_bindings()
         mp.enable_messages('silent:terminal-default')
+        mp.set_property_bool('user-data/mpv/console/open', false)
 
         if input_caller then
             mp.commandv('script-message-to', input_caller, 'input-event',
@@ -1996,6 +1983,10 @@ mp.register_event('log-message', function(e)
     -- Use color for debug/v/warn/error/fatal messages.
     log_add('[' .. e.prefix .. '] ' .. e.text:sub(1, -2), styles[e.level],
             terminal_styles[e.level])
+end)
+
+mp.register_event('shutdown', function ()
+    mp.del_property('user-data/mpv/console')
 end)
 
 require 'mp.options'.read_options(opts, nil, render)
