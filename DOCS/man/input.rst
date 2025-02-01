@@ -1754,8 +1754,8 @@ This list uses the event name field value, and the C API symbol in brackets:
     Start of playback after seek or after file was loaded.
 
 ``shutdown`` (``MPV_EVENT_SHUTDOWN``)
-    Sent when the player quits or when a script terminates. Normally handled
-    automatically. See `Details on the script initialization and lifecycle`_.
+    Sent when the player quits, and the script should terminate. Normally
+    handled automatically. See `Details on the script initialization and lifecycle`_.
 
 ``log-message`` (``MPV_EVENT_LOG_MESSAGE``)
     Receives messages enabled with ``mpv_request_log_messages()`` (Lua:
@@ -2109,10 +2109,7 @@ Property list
     Process-id of mpv.
 
 ``path``
-    Full path of the currently played file. Usually this is exactly the same
-    string you pass on the mpv command line or the ``loadfile`` command, even
-    if it's a relative path. If you expect an absolute path, you will have to
-    determine it yourself, for example by using the ``normalize-path`` command.
+    Full absolute path of the currently played file.
 
 ``stream-open-filename``
     The full path to the currently played media. This is different from
