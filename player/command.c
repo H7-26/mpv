@@ -2113,15 +2113,15 @@ static int get_track_entry(int item, int action, void *arg, void *ctx)
             bstr key = {0};
             char *rem = "";
             m_property_split_path(ka->key, &key, &rem);
-            ka->key = !rem[0] ? "metadata" : rem;
-            if (rem[0]) {
-                if (!tags || tags->num_keys == 0) {
-                    ret = M_PROPERTY_UNAVAILABLE;
-                } else {
-                    ret = tag_property(action, (void *)ka, tags);
-                }
-                goto done;
+            ka->key = rem;
+            if (!rem[0]) {
+                ret = M_PROPERTY_ERROR;
+            } else if (!tags || tags->num_keys == 0) {
+                ret = M_PROPERTY_UNAVAILABLE;
+            } else {
+                ret = tag_property(action, (void *)ka, tags);
             }
+            goto done;
         }
         MP_FALLTHROUGH;
     default:
@@ -2290,7 +2290,7 @@ static int mp_property_current_tracks(void *ctx, struct m_property *prop,
     }
     assert(index >= 0);
 
-    char *name = mp_tprintf(80, "track-list/%d/%s", index, rem);
+    char *name = mp_tprintf(80, "track-list/%d%s%s", index, *rem ? "/" : "", rem);
     return mp_property_do(name, ka->action, ka->arg, ctx);
 }
 
