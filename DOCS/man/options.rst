@@ -1299,7 +1299,7 @@ Video
         prove to yourself that it works as desired for the content you care
         about. After that, you can add it to your config file.
 
-        When testing, you should start by using ``hwdec=auto-`` as it will
+        When testing, you should start by using ``hwdec=auto`` as it will
         limit itself to choosing from hwdecs that are actively supported by the
         development team. If that doesn't result in working hardware decoding,
         you can try ``hwdec=auto-unsafe`` to have it attempt to load every
@@ -3766,21 +3766,23 @@ Disc Devices
 ------------
 
 ``--cdda-device=<path>``
-    Specify the CD device for CDDA playback (default: ``/dev/cdrom``).
+    Specify the CD device for CDDA playback. The default device path depends on
+    the OS. See the `OPTICAL DRIVES`_ section.
 
 ``--dvd-device=<path>``
-    Specify the DVD device or .iso filename (default: ``/dev/dvd``). You can
+    Specify the DVD device or .iso filename. You can
     also specify a directory that contains files previously copied directly
-    from a DVD (with e.g. vobcopy).
+    from a DVD (with e.g. vobcopy). The default device path depends on
+    the OS. See the `OPTICAL DRIVES`_ section.
 
     .. admonition:: Example
 
         ``mpv dvd:// --dvd-device=/path/to/dvd/``
 
 ``--bluray-device=<path>``
-    (Blu-ray only)
     Specify the Blu-ray disc location. Must be a directory with Blu-ray
-    structure.
+    structure. The default device path depends on the OS. See the
+    `OPTICAL DRIVES`_ section.
 
     .. admonition:: Example
 
