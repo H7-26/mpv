@@ -1585,16 +1585,18 @@ Video
     the window, while ``--video-zoom`` can zoom in or out arbitrary amounts, and
     also works with ``--video-unscaled``.
 
-``--video-aspect-override=<ratio|no|original>``
+``--video-aspect-override=<ratio|no>``
     Override video aspect ratio, in case aspect information is incorrect or
     missing in the file being played.
 
     These values have special meaning:
 
+    :no: use the method of the ``--video-aspect-method`` option (default)
     :0:  disable aspect ratio handling, pretend the video has square pixels
-    :no: same as ``0``
-    :original: use the video stream or container aspect (default)
-    :-1: same as ``1`` (deprecated)
+         (deprecated, use
+         ``--video-aspect-override=no --video-aspect-method=ignore`` instead)
+    :-1: strictly prefer the container aspect ratio (deprecated, use
+         ``--video-aspect-override=no --video-aspect-method=container`` instead)
 
     But note that handling of these special values might change in the future.
 
@@ -1604,7 +1606,7 @@ Video
         - ``--video-aspect-override=16:9`` or ``--video-aspect-override=1.7777``
         - ``--no-video-aspect-override`` or ``--video-aspect-override=no``
 
-``--video-aspect-method=<bitstream|container>``
+``--video-aspect-method=<bitstream|container|ignore>``
     This sets the default video aspect determination method (if the aspect is
     _not_ overridden by the user with ``--video-aspect-override`` or others).
 
@@ -1615,6 +1617,8 @@ Video
     :bitstream: Strictly prefer the bitstream aspect ratio, unless the bitstream
                 aspect ratio is not set. This is apparently the default behavior
                 with XBMC/kodi, at least with Matroska.
+    :ignore:    Disable aspect ratio handling, pretend the video has square
+                pixels.
 
     The current default for mpv is ``container``.
 
@@ -2668,7 +2672,7 @@ Subtitles
 
     :none:  Don't forward any video stream information.
     :aspect-ratio: Only forward aspect ratio; fallbacks are used for other properties.
-                   This makes behaviour consistent across different video resolutions.
+                   This makes behavior consistent across different video resolutions.
     :all:   Forward all available information, notably including storage resolution.
 
     For certain kinds of broken ASS files which got repurposed across
@@ -2686,7 +2690,7 @@ Subtitles
 
 ``--sub-ass-video-aspect-override=<no|ratio>``
     Allows passing any arbitrary aspect ratio to libass instead of the video’s
-    actual aspect ratio. Zero or negative aspect ratios are identical to ``no``.
+    actual aspect ratio. Zero aspect ratio is identical to ``no``.
 
     This has no effect if ``sub-ass-use-video-data`` is set to ``none``.
 
