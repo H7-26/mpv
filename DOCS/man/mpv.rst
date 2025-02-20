@@ -95,6 +95,9 @@ Shift+Ctrl+BACKSPACE
 ENTER
     Go forward in the playlist.
 
+Shift+HOME and Shift+END
+    Go to the first/last playlist entry.
+
 p and SPACE
     Pause (pressing again unpauses).
 
@@ -203,6 +206,9 @@ S
 Ctrl+s
     Take a screenshot, as the window shows it (with subtitles, OSD, and scaled
     video).
+
+HOME
+    Seek to the beginning of the file.
 
 PGUP and PGDWN
     Seek to the beginning of the previous/next chapter. In most cases,
@@ -1298,7 +1304,7 @@ PROTOCOLS
 
     Play a path from  Samba share. (Requires FFmpeg support.)
 
-``bd://[title][/device]`` ``--bluray-device=PATH``
+``bd://[title]`` ``--bluray-device=PATH``
 
     Play a Blu-ray disc. Since libbluray 1.0.1, you can read from ISO files
     by passing them to ``--bluray-device``.
@@ -1310,7 +1316,7 @@ PROTOCOLS
 
     ``bluray://`` is an alias.
 
-``dvd://[title][/device]`` ``--dvd-device=PATH``
+``dvd://[title]`` ``--dvd-device=PATH``
 
     Play a DVD. DVD menus are not supported. If no title is given, the longest
     title is auto-selected. Without ``--dvd-device``, it will probably try
@@ -1338,9 +1344,20 @@ PROTOCOLS
     ``image-2.jpg`` and ``image-10.jpg``, provided that there are no big gaps
     between the files.
 
-``cdda://[device]`` ``--cdrom-device=PATH`` ``--cdda-...``
+``cdda://`` ``--cdda-device=PATH``
 
-    Play CD.
+    Play CD. You can select a specific range of tracks to play by using the
+    ``--start`` and ``--end`` options and specifying chapters. Navigating
+    forwards and backwards through tracks can also be done by navigating through
+    chapters (``PGUP`` and ``PGDOWN`` in the default keybinds).
+
+    .. admonition:: Example
+
+        ::
+
+            mpv cdda:// --start=#4 --end=#6
+
+        This will start from track 4, play track 5, and then end.
 
 ``lavf://...``
 
