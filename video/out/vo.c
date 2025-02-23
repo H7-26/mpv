@@ -860,12 +860,6 @@ bool vo_is_ready_for_frame(struct vo *vo, int64_t next_pts)
     return r;
 }
 
-// Needed by egl_drm
-bool vo_is_gpu_next(struct vo *vo)
-{
-    return vo && vo->driver && vo->driver == &video_out_gpu_next;
-}
-
 // Check if the VO reports that the mpv window is visible.
 bool vo_is_visible(struct vo *vo)
 {
@@ -1104,6 +1098,7 @@ static void do_redraw(struct vo *vo)
     mp_mutex_unlock(&in->lock);
 
     vo->driver->draw_frame(vo, frame);
+    vo->driver->control(vo, VOCTRL_REDRAW, NULL);
     vo->driver->flip_page(vo);
 
     if (frame != &dummy && !vo->driver->frame_owner)
