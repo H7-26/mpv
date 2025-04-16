@@ -327,7 +327,7 @@ const struct m_sub_options mp_subtitle_sub_opts = {
         {"sub-ass-hinting", OPT_REPLACED("sub-hinting")},
         {"sub-shaper", OPT_CHOICE(sub_shaper, {"simple", 0}, {"complex", 1})},
         {"sub-ass-shaper", OPT_REPLACED("sub-shaper")},
-        {"sub-ass-prune-delay", OPT_DOUBLE(ass_prune_delay), M_RANGE(-1.0, DBL_MAX)},
+        {"sub-ass-prune-delay", OPT_DOUBLE(ass_prune_delay), M_RANGE(-1.0, 10000.0)},
         {"sub-ass-justify", OPT_BOOL(ass_justify)},
         {"sub-scale-by-window", OPT_BOOL(sub_scale_by_window)},
         {"sub-scale-with-window", OPT_BOOL(sub_scale_with_window)},
@@ -338,6 +338,8 @@ const struct m_sub_options mp_subtitle_sub_opts = {
         {"sub-past-video-end", OPT_BOOL(sub_past_video_end)},
         {"sub-ass-force-style", OPT_REPLACED("sub-ass-style-overrides")},
         {"sub-lavc-o", OPT_KEYVALUELIST(sub_avopts), .flags = UPDATE_SUB_HARD},
+        {"sub-glyph-limit", OPT_INT(sub_glyph_limit)},
+        {"sub-bitmap-max-size", OPT_INT(sub_bitmap_max_size)},
         {0}
     },
     .size = sizeof(OPT_BASE_STRUCT),
@@ -409,6 +411,10 @@ const struct m_sub_options mp_osd_render_sub_opts = {
         {"osd-selected-color", OPT_COLOR(osd_selected_color)},
         {"osd-selected-outline-color", OPT_COLOR(osd_selected_outline_color)},
         {"force-rgba-osd-rendering", OPT_BOOL(force_rgba_osd)},
+        {"osd-prune-delay", OPT_DOUBLE(osd_ass_prune_delay), M_RANGE(-1.0, 10000.0)},
+        {"osd-glyph-limit", OPT_INT(osd_glyph_limit)},
+        {"osd-bitmap-max-size", OPT_INT(osd_bitmap_max_size)},
+        {"osd-shaper", OPT_CHOICE(osd_shaper, {"simple", 0}, {"complex", 1})},
         {0}
     },
     .size = sizeof(OPT_BASE_STRUCT),
@@ -417,6 +423,7 @@ const struct m_sub_options mp_osd_render_sub_opts = {
         .osd_scale_by_window = true,
         .osd_selected_color = {250, 189, 47, 255},
         .osd_selected_outline_color = {0, 0, 0, 255},
+        .osd_ass_prune_delay = -1.0,
     },
     .change_flags = UPDATE_OSD,
 };
@@ -1047,8 +1054,8 @@ static const struct MPOpts mp_default_opts = {
     .play_dir = 1,
     .media_controls = true,
     .video_exts = (char *[]){
-        "3g2", "3gp", "avi", "flv", "m2ts", "m4v", "mj2", "mkv", "mov", "mp4",
-        "mpeg", "mpg", "ogv", "rmvb", "ts", "webm", "wmv", "y4m", NULL
+        "3g2", "3gp", "avi", "flv", "ivf", "m2ts", "m4v", "mj2", "mkv", "mov",
+        "mp4", "mpeg", "mpg", "ogv", "rmvb", "ts", "webm", "wmv", "y4m", NULL
     },
     .audio_exts = (char *[]){
         "aac", "ac3", "aiff", "ape", "au", "dts", "eac3", "flac", "m4a", "mka",
