@@ -348,10 +348,10 @@ static void update_overlays(struct vo *vo, struct mp_osd_res res,
                 .src = { b->src_x, b->src_y, b->src_x + b->w, b->src_y + b->h },
                 .dst = { b->x, b->y, b->x + b->dw, b->y + b->dh },
                 .color = {
-                    (c >> 24) / 255.0,
-                    ((c >> 16) & 0xFF) / 255.0,
-                    ((c >> 8) & 0xFF) / 255.0,
-                    1.0 - (c & 0xFF) / 255.0,
+                    (c >> 24) / 255.0f,
+                    ((c >> 16) & 0xFF) / 255.0f,
+                    ((c >> 8) & 0xFF) / 255.0f,
+                    (255 - (c & 0xFF)) / 255.0f,
                 }
             };
             MP_TARRAY_APPEND(p, entry->parts, entry->num_parts, part);
@@ -1060,14 +1060,26 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
     // Assume HDR is supported, if target_csp() is not available
     if (target_csp.transfer == PL_COLOR_TRC_UNKNOWN) {
         target_csp = (struct pl_color_space){
-            .transfer = opts->target_trc ? opts->target_trc : PL_COLOR_TRC_PQ };
+            .transfer = opts->target_trc ? opts->target_trc : pl_color_space_hdr10.transfer };
     }
     if (target_hint && frame->current) {
         const struct pl_color_space *source = &frame->current->params.color;
         const struct pl_color_space *target = &target_csp;
-        hint = *(p->next_opts->target_hint_mode == 0 ? target : source);
-        if (pl_color_transfer_is_hdr(hint.transfer) && !pl_primaries_valid(&hint.hdr.prim))
-            pl_color_space_merge(&hint, source);
+        hint = *source;
+        if (p->next_opts->target_hint_mode == 0) {
+            hint = *target;
+            if (pl_color_transfer_is_hdr(hint.transfer) && !pl_primaries_valid(&hint.hdr.prim))
+                pl_color_space_merge(&hint, source);
+            // Restore target luminance if it was present, note that we check
+            // max_luma only, this make sure that max_cll/max_fall is not take
+            // from source.
+            if (target->hdr.max_luma) {
+                hint.hdr.max_luma = target->hdr.max_luma;
+                hint.hdr.min_luma = target->hdr.min_luma;
+                hint.hdr.max_cll  = target->hdr.max_cll;
+                hint.hdr.max_fall = target->hdr.max_fall;
+            }
+        }
         if (p->next_opts->target_hint_mode == 2) { // source-dynamic
             pl_color_space_nominal_luma_ex(pl_nominal_luma_params(
                 .color      = &hint,
@@ -1081,7 +1093,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
         // information after user option overrides. For example, if the user
         // sets target_trc to PQ, but the hint(source) is SDR, we want to fill
         // in SDR luminance values instead of the default PQ range.
-        pl_color_space_infer(&hint);
+        struct pl_color_space source_csp = *source;
+        pl_color_space_infer_map(&source_csp, &hint);
         // Always prefer target luminance and transfer for inverse tone mapping
         if (pl_color_transfer_is_hdr(target->transfer) && opts->tone_map.inverse) {
             hint.transfer     = target->transfer;
@@ -1129,7 +1142,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
     // Calculate target
     struct pl_frame target;
     pl_frame_from_swapchain(&target, &swframe);
-    apply_target_options(p, &target, target_csp.hdr.min_luma, target_hint && !pass_colorspace);
+    apply_target_options(p, &target, hint.hdr.min_luma, target_hint && !pass_colorspace);
     update_overlays(vo, p->osd_res,
                     (frame->current && opts->blend_subs) ? OSD_DRAW_OSD_ONLY : 0,
                     PL_OVERLAY_COORDS_DST_FRAME, &p->osd_state, &target, frame->current);
@@ -1190,20 +1203,23 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
                 if (frame->redraw)
                     p->osd_sync++;
                 if (fp->osd_sync < p->osd_sync) {
-                    float rx = pl_rect_w(p->dst) / pl_rect_w(image->crop);
-                    float ry = pl_rect_h(p->dst) / pl_rect_h(image->crop);
+                    float w = pl_rect_w(opts->blend_subs == BLEND_SUBS_VIDEO ? image->crop : target.crop);
+                    float h = pl_rect_h(opts->blend_subs == BLEND_SUBS_VIDEO ? image->crop : target.crop);
+                    float rx = w / pl_rect_w(image->crop);
+                    float ry = h / pl_rect_h(image->crop);
                     struct mp_osd_res res = {
-                        .w = pl_rect_w(p->dst),
-                        .h = pl_rect_h(p->dst),
+                        .w = w,
+                        .h = h,
                         .ml = -image->crop.x0 * rx,
                         .mr = (image->crop.x1 - vo->params->w) * rx,
                         .mt = -image->crop.y0 * ry,
                         .mb = (image->crop.y1 - vo->params->h) * ry,
                         .display_par = 1.0,
                     };
+                    enum pl_overlay_coords rel = opts->blend_subs == BLEND_SUBS_VIDEO
+                        ? PL_OVERLAY_COORDS_SRC_CROP : PL_OVERLAY_COORDS_DST_CROP;
                     update_overlays(vo, res, OSD_DRAW_SUB_ONLY,
-                                    PL_OVERLAY_COORDS_DST_CROP,
-                                    &fp->subs, image, mpi);
+                                    rel, &fp->subs, image, mpi);
                     fp->osd_sync = p->osd_sync;
                 }
             } else {
@@ -1523,20 +1539,23 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
 
     struct frame_priv *fp = mpi->priv;
     if (opts->blend_subs) {
-        float rx = pl_rect_w(dst) / pl_rect_w(image.crop);
-        float ry = pl_rect_h(dst) / pl_rect_h(image.crop);
+        float w = pl_rect_w(opts->blend_subs == BLEND_SUBS_VIDEO ? image.crop : target.crop);
+        float h = pl_rect_h(opts->blend_subs == BLEND_SUBS_VIDEO ? image.crop : target.crop);
+        float rx = w / pl_rect_w(image.crop);
+        float ry = h / pl_rect_h(image.crop);
         struct mp_osd_res res = {
-            .w = pl_rect_w(dst),
-            .h = pl_rect_h(dst),
+            .w = w,
+            .h = h,
             .ml = -image.crop.x0 * rx,
             .mr = (image.crop.x1 - vo->params->w) * rx,
             .mt = -image.crop.y0 * ry,
             .mb = (image.crop.y1 - vo->params->h) * ry,
             .display_par = 1.0,
         };
+        enum pl_overlay_coords rel = opts->blend_subs == BLEND_SUBS_VIDEO
+            ? PL_OVERLAY_COORDS_SRC_CROP : PL_OVERLAY_COORDS_DST_CROP;
         update_overlays(vo, res, osd_flags,
-                        PL_OVERLAY_COORDS_DST_CROP,
-                        &fp->subs, &image, mpi);
+                        rel, &fp->subs, &image, mpi);
     } else {
         // Disable overlays when blend_subs is disabled
         update_overlays(vo, osd, osd_flags, PL_OVERLAY_COORDS_DST_FRAME,
