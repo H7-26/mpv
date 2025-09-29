@@ -2108,6 +2108,7 @@ static void image_description_failed(void *data, struct wp_image_description_v1 
 {
     struct vo_wayland_state *wl = data;
     MP_VERBOSE(wl, "Image description failed: %d, %s\n", cause, msg);
+    wp_color_management_surface_v1_unset_image_description(wl->color_surface);
     wp_image_description_v1_destroy(image_description);
 }
 
@@ -3450,8 +3451,6 @@ static void set_color_management(struct vo_wayland_state *wl)
     if (!wl->color_surface)
         return;
 
-    wp_color_management_surface_v1_unset_image_description(wl->color_surface);
-
     struct pl_color_space color = wl->target_params.color;
     int primaries = wl->primaries_map[color.primaries];
     int transfer = wl->transfer_map[color.transfer];
@@ -3459,15 +3458,16 @@ static void set_color_management(struct vo_wayland_state *wl)
         MP_VERBOSE(wl, "Compositor does not support color primary: %s\n", m_opt_choice_str(pl_csp_prim_names, color.primaries));
     if (!transfer)
         MP_VERBOSE(wl, "Compositor does not support transfer function: %s\n", m_opt_choice_str(pl_csp_trc_names, color.transfer));
-    if (!primaries || !transfer)
+    if (!primaries || !transfer) {
+        wp_color_management_surface_v1_unset_image_description(wl->color_surface);
         return;
+    }
 
     struct wp_image_description_creator_params_v1 *image_creator_params =
         wp_color_manager_v1_create_parametric_creator(wl->color_manager);
     wp_image_description_creator_params_v1_set_primaries_named(image_creator_params, primaries);
     wp_image_description_creator_params_v1_set_tf_named(image_creator_params, transfer);
 
-    pl_color_space_infer(&wl->target_params.color);
     struct pl_hdr_metadata hdr = wl->target_params.color.hdr;
     bool is_hdr = pl_color_transfer_is_hdr(color.transfer);
     bool use_metadata = hdr_metadata_valid(&hdr);
@@ -4135,6 +4135,7 @@ void vo_wayland_handle_color(struct vo_wayland_state *wl)
     if (!wl->vo->target_params)
         return;
     struct mp_image_params target_params = vo_get_target_params(wl->vo);
+    pl_color_space_infer(&target_params.color);
     if (pl_color_space_equal(&target_params.color, &wl->target_params.color) &&
         pl_color_repr_equal(&target_params.repr, &wl->target_params.repr) &&
         target_params.chroma_location == wl->target_params.chroma_location)
@@ -4474,7 +4475,8 @@ void vo_wayland_uninit(struct vo *vo)
     mp_input_put_key(wl->vo->input_ctx, MP_INPUT_RELEASE_ALL);
 
     // Ensure that any in-flight vo_wayland_preferred_description_info get deallocated.
-    wl_display_roundtrip(wl->display);
+    if (wl->display)
+        wl_display_roundtrip(wl->display);
 
     if (wl->compositor)
         wl_compositor_destroy(wl->compositor);
