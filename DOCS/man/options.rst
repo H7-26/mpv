@@ -2885,8 +2885,19 @@ Subtitles
 
 ``--sub-fix-timing=<yes|no>``
     Adjust subtitle timing is to remove minor gaps or overlaps between
-    subtitles (if the difference is smaller than 210 ms, the gap or overlap
-    is removed).
+    subtitles.
+
+    See also: ``--sub-fix-timing-threshold`` and ``--sub-fix-timing-keep``.
+
+``--sub-fix-timing-threshold=<amount>``
+    Set the threshold in milliseconds for fixing subtitle timing (default: 210).
+    If the gap between two subtitle events is smaller than this, the gap is
+    removed.
+
+``--sub-fix-timing-keep=<amount>``
+    Set the minimum duration in milliseconds for subtitle events to be
+    considered for timing fixes (default: 400). If a subtitle event has a
+    duration smaller than this, its timing is not changed.
 
 ``--sub-forced-events-only=<yes|no>``
     Enabling this displays only forced events within subtitle streams. Only
@@ -7095,6 +7106,7 @@ them.
         mode adapts the source content to the target display before output.
         Note: HDR primaries are not overridden by the ``--target-prim`` option
         this only affects the enclosing container for the colorspace.
+        ``--target-gamut`` can be used to limit the output gamut if needed.
 
     source
         Uses the source content's metadata. This is the traditional
