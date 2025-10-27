@@ -1834,7 +1834,7 @@ Video
     You can get the list of allowed codecs with ``mpv --vd=help``. Remove the
     prefix, e.g. instead of ``lavc:h264`` use ``h264``.
 
-    By default, this is set to ``h264,vc1,hevc,vp8,vp9,av1,prores,ffv1``. Note that
+    By default, this is set to ``h264,vc1,hevc,vp8,vp9,av1,prores,prores_raw,ffv1``. Note that
     the hardware acceleration special codecs like ``h264_vdpau`` are not
     relevant anymore, and in fact have been removed from FFmpeg in this form.
 
@@ -8252,6 +8252,10 @@ Miscellaneous
     ``mac``
         macOS backend.
 
+    ``x11``
+        X11 backend. This backend is only available if the X server
+        supports the ``Xfixes`` extension.
+
     ``wayland``
         Wayland backend. This backend is only available if the compositor
         supports the ``ext-data-control-v1`` protocol.
@@ -8265,8 +8269,6 @@ Miscellaneous
     This is an object settings list option. See `List Options`_ for details.
 
 ``--clipboard-monitor=<yes|no>``
-    (Windows, Wayland and macOS only)
-
     Enable clipboard monitoring so that the ``clipboard`` property can be
     observed for content changes (default: no). This only affects clipboard
     implementations which use polling to monitor clipboard updates.
@@ -8276,6 +8278,15 @@ Miscellaneous
     On Wayland, this option only has effect on the ``wayland`` backend, and
     not for the ``vo`` backend. See ``current-clipboard-backend`` property for
     more details.
+
+``--clipboard-xwayland=<yes|no>``
+    Enable X11 clipboard backend in suspected Wayland environments
+    (default: no).
+
+    Depending on the Wayland compositor, using X11 backend may result in mpv
+    unable to acquire clipboard data from native Wayland clients. Disabling the
+    X11 backend when Wayland backend is unavailable makes mpv fallback to the
+    VO backend which allows clipboard to work properly.
 
 ``--register``
     (Windows only) (available also as mpv-register helper)
