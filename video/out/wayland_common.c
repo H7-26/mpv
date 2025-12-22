@@ -1985,6 +1985,7 @@ static const struct wp_fractional_scale_v1_listener fractional_scale_listener = 
     preferred_scale,
 };
 
+#if HAVE_WAYLAND_PROTOCOLS_1_41
 static void log_color_space(struct mp_log *log, struct vo_wayland_preferred_description_info *wd)
 {
     const struct pl_color_space *csp = &wd->csp;
@@ -2007,7 +2008,6 @@ static void log_color_space(struct mp_log *log, struct vo_wayland_preferred_desc
         csp->hdr.prim.white.x, csp->hdr.prim.white.y);
 }
 
-#if HAVE_WAYLAND_PROTOCOLS_1_41
 static void supported_intent(void *data, struct wp_color_manager_v1 *color_manager,
                              uint32_t render_intent)
 {
@@ -3253,6 +3253,7 @@ static int handle_round(int scale, int n)
     return (scale * n + WAYLAND_SCALE_FACTOR / 2) / WAYLAND_SCALE_FACTOR;
 }
 
+#if HAVE_WAYLAND_PROTOCOLS_1_41
 static bool hdr_metadata_valid(struct vo_wayland_state *wl, struct pl_hdr_metadata *hdr)
 {
     // Always return a hard failure if this condition fails.
@@ -3277,6 +3278,7 @@ static bool hdr_metadata_valid(struct vo_wayland_state *wl, struct pl_hdr_metada
 
     return true;
 }
+#endif
 
 static void request_decoration_mode(struct vo_wayland_state *wl, uint32_t mode)
 {
