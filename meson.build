@@ -355,6 +355,13 @@ if features['libdl']
     dependencies += libdl
 endif
 
+subrandr = dependency('subrandr', version: '>= 0.1.1', required: get_option('subrandr'))
+features += {'subrandr': subrandr.found()}
+if features['subrandr']
+    sources += files('demux/demux_sbr.c', 'sub/sd_sbr.c')
+    dependencies += subrandr
+endif
+
 # C11 atomics are mandatory but linking to the library is not always required.
 dependencies += cc.find_library('atomic', required: false)
 
@@ -1392,6 +1399,13 @@ features += {'d3d-hwaccel': d3d_hwaccel.allowed()}
 if features['d3d-hwaccel']
     sources += files('video/d3d.c',
                      'video/filter/vf_d3d11vpp.c')
+endif
+
+amf = cc.has_header('AMF/core/Factory.h', required:
+    get_option('amf').require(features['d3d-hwaccel']))
+features += {'amf': amf}
+if features['amf']
+    sources += files('video/filter/vf_amf.c')
 endif
 
 if features['d3d-hwaccel'] and features['egl-angle']

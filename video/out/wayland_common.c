@@ -39,7 +39,7 @@
 // Generated from wayland-protocols
 #include "idle-inhibit-unstable-v1.h"
 #include "text-input-unstable-v3.h"
-#include "linux-dmabuf-unstable-v1.h"
+#include "linux-dmabuf-v1.h"
 #include "presentation-time.h"
 #include "xdg-activation-v1.h"
 #include "xdg-decoration-unstable-v1.h"
@@ -2663,7 +2663,7 @@ static void registry_handle_add(void *data, struct wl_registry *reg, uint32_t id
     }
 
     if (!strcmp (interface, zwp_linux_dmabuf_v1_interface.name) && (ver >= 4) && found++) {
-        ver = 4;
+        ver = MPMIN(ver, 5);
         wl->dmabuf = wl_registry_bind(reg, id, &zwp_linux_dmabuf_v1_interface, ver);
         wl->dmabuf_feedback = zwp_linux_dmabuf_v1_get_default_feedback(wl->dmabuf);
         zwp_linux_dmabuf_feedback_v1_add_listener(wl->dmabuf_feedback, &dmabuf_feedback_listener, wl);
@@ -2723,7 +2723,7 @@ static void registry_handle_add(void *data, struct wl_registry *reg, uint32_t id
     }
 
     if (!strcmp(interface, wl_shm_interface.name) && found++) {
-        ver = 1;
+        ver = MPMIN(ver, 2);
         wl->shm = wl_registry_bind(reg, id, &wl_shm_interface, ver);
     }
 
@@ -2768,7 +2768,7 @@ static void registry_handle_add(void *data, struct wl_registry *reg, uint32_t id
     }
 
     if (!strcmp(interface, xdg_wm_base_interface.name) && found++) {
-        ver = MPMIN(ver, 6); /* Cap at 6 in case new events are added later. */
+        ver = MPMIN(ver, 7);
         wl->wm_base = wl_registry_bind(reg, id, &xdg_wm_base_interface, ver);
         xdg_wm_base_add_listener(wl->wm_base, &xdg_wm_base_listener, wl);
     }
