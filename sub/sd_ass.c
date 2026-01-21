@@ -998,6 +998,7 @@ static void reset(struct sd *sd)
     if (sd->opts->sub_clear_on_seek || ctx->clear_once) {
         ass_flush_events(ctx->ass_track);
         ctx->num_seen_packets = 0;
+        ctx->num_packets_animated = 0;
         sd->preload_ok = false;
         ctx->clear_once = false;
     }
@@ -1032,6 +1033,10 @@ static int control(struct sd *sd, enum sd_ctrl cmd, void *arg)
     }
     case SD_CTRL_SET_ANIMATED_CHECK:
         ctx->check_animated = *(bool *)arg;
+        return CONTROL_OK;
+    case SD_CTRL_RESET_SOFT:
+        ctx->clear_once = true;
+        reset(sd);
         return CONTROL_OK;
     case SD_CTRL_SET_VIDEO_PARAMS:
         ctx->video_params = *(struct mp_image_params *)arg;
