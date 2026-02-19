@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <windows.h>
 #include <d3d11.h>
+#include <d3d11_1.h>
 
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_d3d11va.h>
@@ -34,6 +35,7 @@
 #include "video/hwdec.h"
 #include "video/mp_image.h"
 #include "video/mp_image_pool.h"
+#include "video/out/gpu/d3d11_helpers.h"
 
 // For video processor extensions identifiers reference see:
 // https://chromium.googlesource.com/chromium/src/+/5f354f38/ui/gl/swap_chain_presenter.cc
@@ -163,13 +165,36 @@ static void enable_nvidia_rtx_extension(struct mp_filter *vf)
     if (FAILED(hr)) {
         MP_WARN(vf, "Failed to enable NVIDIA RTX Super Resolution: %s\n", mp_HRESULT_to_str(hr));
     } else {
-        MP_VERBOSE(vf, "NVIDIA RTX Super Resolution enabled\n");
+        MP_VERBOSE(vf, "NVIDIA RTX Super Resolution enabled.\n");
     }
 }
 
-static void enable_nvidia_true_hdr(struct mp_filter *vf)
+static bool supports_nvidia_true_hdr(struct mp_filter *vf)
 {
     struct priv *p = vf->priv;
+
+    UINT supported = 0;
+    HRESULT hr = ID3D11VideoContext_VideoProcessorGetStreamExtension(p->video_ctx,
+                                                                     p->video_proc,
+                                                                     0,
+                                                                     &NVIDIA_TRUE_HDR_INTERFACE_GUID,
+                                                                     sizeof(supported),
+                                                                     &supported);
+
+    if (FAILED(hr) || !supported) {
+        MP_WARN(vf, "NVIDIA RTX Video HDR not supported.\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool enable_nvidia_true_hdr(struct mp_filter *vf)
+{
+    struct priv *p = vf->priv;
+
+    if (!supports_nvidia_true_hdr(vf))
+        return false;
 
     struct nvidia_ext {
         unsigned int version;
@@ -187,9 +212,11 @@ static void enable_nvidia_true_hdr(struct mp_filter *vf)
 
     if (FAILED(hr)) {
         MP_WARN(vf, "Failed to enable NVIDIA RTX Video HDR: %s\n", mp_HRESULT_to_str(hr));
-    } else {
-        MP_VERBOSE(vf, "NVIDIA RTX Video HDR enabled\n");
+        return false;
     }
+
+    MP_VERBOSE(vf, "NVIDIA RTX Video HDR enabled.\n");
+    return true;
 }
 
 static void enable_intel_vsr_extension(struct mp_filter *vf)
@@ -229,7 +256,7 @@ static void enable_intel_vsr_extension(struct mp_filter *vf)
     if (FAILED(hr))
         goto failed;
 
-    MP_VERBOSE(vf, "Intel Video Super Resolution enabled\n");
+    MP_VERBOSE(vf, "Intel Video Super Resolution enabled.\n");
     return;
 
 failed:
@@ -374,16 +401,57 @@ static int recreate_video_proc(struct mp_filter *vf)
                                                             D3D11_VIDEO_PROCESSOR_OUTPUT_RATE_NORMAL,
                                                          FALSE, 0);
 
-    D3D11_VIDEO_PROCESSOR_COLOR_SPACE csp = {
-        .YCbCr_Matrix = p->params.repr.sys != PL_COLOR_SYSTEM_BT_601,
-        .Nominal_Range = p->params.repr.levels == PL_COLOR_LEVELS_LIMITED ? 1 : 2,
-    };
-    ID3D11VideoContext_VideoProcessorSetStreamColorSpace(p->video_ctx,
-                                                         p->video_proc,
-                                                         0, &csp);
-    ID3D11VideoContext_VideoProcessorSetOutputColorSpace(p->video_ctx,
-                                                         p->video_proc,
-                                                         &csp);
+    if (p->opts->nvidia_true_hdr && enable_nvidia_true_hdr(vf)) {
+        // NVIDIA RTX Video HDR seems to require BT.2020+PQ RGB output.
+        p->out_params.color = pl_color_space_hdr10;
+        p->out_params.color.hdr.max_luma = 1000;
+        MP_WARN(vf, "Tagging image output as HDR with max-luma=1000 nits for "
+                    "NVIDIA RTX Video HDR. This is only a guess. "
+                    "Adjust the value to match NVIDIA settings with "
+                    "`--vf-add=format=max-luma=<value>`.\n");
+        const enum mp_imgfmt output_format = IMGFMT_X2BGR10;
+        if (p->opts->format) {
+            // Don't override user choice, even if it might break output.
+            if (p->out_params.hw_subfmt != output_format) {
+                MP_WARN(vf, "Requested %s format is not supported for NVIDIA RTX Video HDR. "
+                            "Consider using %s instead or leave it unspecified.\n",
+                        mp_imgfmt_to_name(p->opts->format),
+                        mp_imgfmt_to_name(output_format));
+            }
+        } else {
+            p->out_params.hw_subfmt = output_format;
+        }
+    }
+
+    mp_image_params_guess_csp(&p->params);
+    mp_image_params_guess_csp(&p->out_params);
+
+    ID3D11VideoContext1 *video_ctx1;
+    hr = ID3D11VideoContext_QueryInterface(p->video_ctx, &IID_ID3D11VideoContext1, (void **)&video_ctx1);
+    if (SUCCEEDED(hr)) {
+        DXGI_COLOR_SPACE_TYPE in = mp_params_to_dxgi_colorspace(vf->log, &p->params);
+        DXGI_COLOR_SPACE_TYPE out = mp_params_to_dxgi_colorspace(vf->log, &p->out_params);
+        if (in != out)
+            MP_VERBOSE(vf, "Converting %s to %s.\n", d3d11_get_csp_name(in), d3d11_get_csp_name(out));
+        ID3D11VideoContext1_VideoProcessorSetStreamColorSpace1(video_ctx1,
+                                                               p->video_proc,
+                                                               0, in);
+        ID3D11VideoContext1_VideoProcessorSetOutputColorSpace1(video_ctx1,
+                                                               p->video_proc,
+                                                               out);
+        SAFE_RELEASE(video_ctx1);
+    } else {
+        D3D11_VIDEO_PROCESSOR_COLOR_SPACE csp = {
+            .YCbCr_Matrix = p->params.repr.sys != PL_COLOR_SYSTEM_BT_601,
+            .Nominal_Range = p->params.repr.levels == PL_COLOR_LEVELS_LIMITED ? 1 : 2,
+        };
+        ID3D11VideoContext_VideoProcessorSetStreamColorSpace(p->video_ctx,
+                                                            p->video_proc,
+                                                            0, &csp);
+        ID3D11VideoContext_VideoProcessorSetOutputColorSpace(p->video_ctx,
+                                                            p->video_proc,
+                                                            &csp);
+    }
 
     switch (p->opts->scaling_mode) {
     case SCALING_INTEL_VSR:
@@ -393,9 +461,6 @@ static int recreate_video_proc(struct mp_filter *vf)
         enable_nvidia_rtx_extension(vf);
         break;
     }
-
-    if (p->opts->nvidia_true_hdr)
-        enable_nvidia_true_hdr(vf);
 
     return 0;
 fail:
@@ -481,12 +546,8 @@ static struct mp_image *render(struct mp_filter *vf)
     ID3D11Texture2D *d3d_tex = (void *)in->planes[0];
 
     mp_image_copy_attributes(out, in);
-    // mp_image_copy_attributes overwrites the height and width
-    // set it the size back if we are using scale
-    mp_image_set_size(out, p->out_params.w, p->out_params.h);
-    // mp_image_copy_attributes will set the crop value to the origin
-    // width and height, set the crop back to the default state
-    out->params.crop = p->out_params.crop;
+    // TODO: sanitize out_params based the processing enabled.
+    out->params = p->out_params;
 
     D3D11_VIDEO_FRAME_FORMAT d3d_frame_format;
     if (!mp_refqueue_should_deint(p->queue)) {
@@ -602,9 +663,7 @@ static void vf_d3d11vpp_process(struct mp_filter *vf)
         if (p->opts->format)
             p->out_params.hw_subfmt = p->opts->format;
 
-        p->require_filtering = p->params.hw_subfmt != p->out_params.hw_subfmt ||
-                               p->params.w != p->out_params.w ||
-                               p->params.h != p->out_params.h ||
+        p->require_filtering = !mp_image_params_static_equal(&p->params, &p->out_params) ||
                                p->opts->nvidia_true_hdr;
     }
 
