@@ -1060,7 +1060,7 @@ static bool render_frame(struct vo *vo)
         // no redraw request, then something can change this (i.e. the OSD)
         // while the vo was unlocked. If we are paused, don't touch
         // in->request_redraw in that case and let do_redraw do the work later.
-        if (request_redraw && !in->paused)
+        if (request_redraw || !in->paused)
             in->request_redraw = false;
     }
 
