@@ -12,6 +12,7 @@
 -- OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 -- CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+local msg = require "mp.msg"
 local utils = require "mp.utils"
 local assdraw = require "mp.assdraw"
 
@@ -205,6 +206,17 @@ local function utf8_positions(str)
     end
 
     return positions
+end
+
+-- Converts values to strings, using JSON formatting for tables.
+-- JSON is used instead of utils.to_string as that is the format the
+-- values are received in from script-messages.
+local function to_string(v)
+    if type(v) == "table" then
+        return utils.format_json(v)
+    else
+        return tostring(v)
+    end
 end
 
 
@@ -1687,24 +1699,47 @@ mp.register_script_message("disable", function(message)
 end)
 
 mp.register_script_message("get-input", function (args)
+    args = utils.parse_json(args)
+    if type(args) ~= "table" then
+        return msg.error("Input request aborted - " ..
+                         "get-input must be passed a JSON formatted table.")
+    end
+
+    if not args.client_name or not args.handler_id then
+        return msg.error("Input request aborted - " ..
+                         "get-input must be passed a 'client_name' and 'handler_id'")
+    end
+
     if open then
         mp.commandv("script-message-to", input_caller, input_caller_handler,
                     "closed", utils.format_json({line, cursor}))
     end
 
-    args = utils.parse_json(args)
     input_caller = args.client_name
     input_caller_handler = args.handler_id
-    prompt = args.prompt or ""
-    line = args.default_text or ""
-    cursor = tonumber(args.cursor_position) or line:len() + 1
+    prompt = to_string(args.prompt or "")
+    line = to_string(args.default_text or "")
+    cursor = math.floor(tonumber(args.cursor_position) or line:len() + 1)
     keep_open = args.keep_open
     default_item = args.default_item
     has_completions = args.has_completions
     searching_history = false
+    if cursor < 1 then
+        cursor = 1
+    elseif cursor > line:len() + 1 then
+        cursor = line:len() + 1
+    end
+
     enable_completions()
 
     if args.items then
+        if type(args.items) ~= "table" then
+            msg.warn(("input.select (%s): 'items' must be a table, instead received a %s"
+                     ):format(input_caller, type(args.items)))
+            -- set as empty to avoid errors
+            args.items = {}
+        end
+
         selectable_items = {}
         horizontal_offset = 0
 
@@ -1718,6 +1753,7 @@ mp.register_script_message("get-input", function (args)
         end
 
         for i, item in ipairs(args.items) do
+            item = to_string(item)
             local last = next_utf8(item, limit) - 1
             selectable_items[i] = item:gsub("[\r\n].*", "…"):sub(1, last) ..
                                   (last < #item and "…" or "")
@@ -1729,7 +1765,7 @@ mp.register_script_message("get-input", function (args)
     else
         selectable_items = nil
         unbind_mouse()
-        id = args.id
+        id = args.id or input_caller .. args.prompt
         log_offset = 0
         completion_buffer = {}
         autoselect_completion = args.autoselect_completion
@@ -1740,7 +1776,9 @@ mp.register_script_message("get-input", function (args)
             histories_to_save[id] = ""
         end
         history = histories[id]
-        history_paths[id] = args.history_path
+
+        -- We probably do not want to be converting accidental non-string values to filepaths.
+        history_paths[id] = type(args.history_path) == "string" and args.history_path or nil
         read_history()
         history_pos = #history + 1
 
@@ -1758,18 +1796,19 @@ end)
 -- Add a line to the log buffer
 mp.register_script_message("log", function (message)
     message = utils.parse_json(message or "")
-    if not message or not message.log_id then
-        return
+    if type(message) ~= "table" or not message.log_id then
+        return msg.error("Line not appended to log buffer - " ..
+                         "log must be passed a JSON formatted table which contains a 'log_id'.")
     end
 
     local log_buffer = log_buffers[message.log_id]
     if not log_buffer then return end
 
     log_buffer[#log_buffer + 1] = {
-        text = message.text,
-        style = message.error and styles.error or message.style or "",
+        text = to_string(message.text or ""),
+        style = message.error and styles.error or to_string(message.style or ""),
         terminal_style = message.error and terminal_styles.error or
-                         message.terminal_style or "",
+                         to_string(message.terminal_style or ""),
     }
 
     if #log_buffer > MAX_LOG_LINES then
@@ -1793,22 +1832,31 @@ mp.register_script_message("log", function (message)
 end)
 
 mp.register_script_message("set-log", function (log_id, log)
-    if not log_id or not log then
-        return
+    log = utils.parse_json(log)
+    if not log_id then
+        return msg.error("Log buffer not overwritten - " ..
+                         "set-log must be passed a 'log_id' as the first argument.")
     end
 
-    log = utils.parse_json(log)
+    -- This error message provides extra details as mp.input passes the `log` table to
+    -- console.lua unchanged, meaning that this guard may be triggered by Lua and Js clients.
+    if type(log) ~= "table" then
+        return msg.error("Log buffer not overwritten - " ..
+                         "set-log must be passed a table as second argument, " ..
+                         ("instead received a %s."):format(type(log)))
+    end
+
     log_buffers[log_id] = {}
 
     for i = 1, #log do
         if type(log[i]) == "table" then
-            log[i].text = log[i].text
-            log[i].style = log[i].style or ""
-            log[i].terminal_style = log[i].terminal_style or ""
+            log[i].text = to_string(log[i].text or "")
+            log[i].style = to_string(log[i].style or "")
+            log[i].terminal_style = to_string(log[i].terminal_style or "")
             log_buffers[id][i] = log[i]
         else
             log_buffers[id][i] = {
-                text = log[i],
+                text = to_string(log[i] or ""),
                 style = "",
                 terminal_style = "",
             }
@@ -1822,6 +1870,10 @@ end)
 
 mp.register_script_message("complete", function (message)
     message = utils.parse_json(message)
+    if type(message) ~= "table" then
+        return msg.error("Completions not received - " ..
+                         "complete must be passed a JSON formatted table.")
+    end
 
     if message.client_name ~= input_caller or message.handler_id ~= input_caller_handler then
         return
@@ -1830,9 +1882,25 @@ mp.register_script_message("complete", function (message)
     completion_buffer = {}
     selected_completion_index = 0
     local completions = message.list
+
+    if type(completions) ~= "table" then
+        msg.warn(("Completions invalid (%s) - " ..
+                  "completions must be a table, instead received a %s"
+                 ):format(input_caller, type(completions)))
+        completions = {}
+    else
+        for i = 1, #completions do
+            completions[i] = to_string(completions[i])
+        end
+    end
+
     table.sort(completions)
-    completion_pos = message.start_pos
-    completion_append = message.append
+    completion_pos = math.floor(tonumber(message.start_pos) or 1)
+    completion_append = to_string(message.append or "")
+    if completion_pos < 1 then
+        completion_pos = 1
+    end
+
     for i, match in ipairs(fuzzy_find(line:sub(completion_pos, cursor - 1),
                                       completions)) do
         completion_buffer[i] = completions[match[1]]
