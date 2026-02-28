@@ -947,7 +947,7 @@ static void apply_crop(struct pl_frame *frame, struct mp_rect crop,
 static void set_colorspace_hint(struct priv *p, struct pl_color_space *hint)
 {
     struct ra_swapchain *sw = p->ra_ctx->swapchain;
-    int alpha = 0;
+    enum pl_alpha_mode alpha = PL_ALPHA_UNKNOWN;
 #if PL_API_VER >= 344
     alpha = PL_ALPHA_NONE;
 #endif
@@ -956,7 +956,7 @@ static void set_colorspace_hint(struct priv *p, struct pl_color_space *hint)
         .color = hint ? *hint : pl_color_space_srgb,
         .repr = {
             .sys = PL_COLOR_SYSTEM_RGB,
-            .levels = p->output_levels,
+            .levels = p->output_levels ? p->output_levels : PL_COLOR_LEVELS_FULL,
             .alpha = p->ra_ctx->opts.want_alpha ? PL_ALPHA_INDEPENDENT : alpha,
         },
     };
