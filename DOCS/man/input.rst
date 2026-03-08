@@ -1992,7 +1992,7 @@ The following hooks are currently defined:
 
 ``on_preloaded``
     Called after a file has been opened, and before tracks are selected and
-    decoders are created. This has some usefulness if an API users wants
+    decoders are created. This has some usefulness if an API user wants
     to select tracks manually, based on the set of available tracks. It's
     also useful to initialize ``--lavfi-complex`` in a specific way by API,
     without having to "probe" the available streams at first.
@@ -2002,6 +2002,13 @@ The following hooks are currently defined:
     what is not yet available yet, is all subject to change.
 
     Ordered after ``on_load_fail`` etc. and before ``playback-restart``.
+
+``on_loaded``
+    Called after a file has been loaded, after tracks are selected but before
+    starting playback. This has some usefulness if an API user wants
+    to act on selected track metadata before the media is shown.
+
+    Ordered after ``on_preloaded``. and before ``playback-restart``.
 
 ``on_unload``
     Run before closing a file, and before actually uninitializing
