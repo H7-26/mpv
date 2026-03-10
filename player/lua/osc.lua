@@ -48,6 +48,9 @@ local user_opts = {
     visibility_modes = "never_auto_always", -- visibility modes to cycle through
     boxmaxchars = 80,           -- title crop threshold for box layout
     boxvideo = false,           -- apply osc_param.video_margins to video
+    dynamic_margins = false,    -- update margins dynamically with OSC visibility
+    sub_margins = true,         -- adjust sub-margin-y to not overlap with OSC
+    osd_margins = true,         -- adjust osd-margin-y to not overlap with OSC
     windowcontrols = "auto",    -- whether to show window controls
     windowcontrols_alignment = "right", -- which side to show window controls on
     windowcontrols_title = "${media-title}", -- same as title but for windowcontrols
@@ -540,6 +543,18 @@ local function cache_enabled()
     return state.cache_state and #state.cache_state["seekable-ranges"] > 0
 end
 
+local function set_margin_offset(prop, offset)
+    if offset > 0 then
+        if not state[prop] then
+            state[prop] = mp.get_property_number(prop)
+        end
+        mp.set_property_number(prop, state[prop] + offset)
+    elseif state[prop] then
+        mp.set_property_number(prop, state[prop])
+        state[prop] = nil
+    end
+end
+
 local function reset_margins()
     if state.using_video_margins then
         for _, mopt in ipairs(margins_opts) do
@@ -547,18 +562,20 @@ local function reset_margins()
         end
         state.using_video_margins = false
     end
+    set_margin_offset("sub-margin-y", 0)
+    set_margin_offset("osd-margin-y", 0)
 end
 
 local function update_margins()
-    local margins = osc_param.video_margins
-
-    -- Don't use margins if it's visible only temporarily.
-    if not state.osc_visible or get_hidetimeout() >= 0 or
-       (state.fullscreen and not user_opts.showfullscreen) or
-       (not state.fullscreen and not user_opts.showwindowed)
-    then
-        margins = {l = 0, r = 0, t = 0, b = 0}
-    end
+    local use_margins = get_hidetimeout() < 0 or user_opts.dynamic_margins
+    local top_vis = (user_opts.layout:find("top") and state.osc_visible) or state.wc_visible
+    local bottom_vis = user_opts.layout:find("bottom") and state.osc_visible
+    local margins = {
+        l = use_margins and osc_param.video_margins.l or 0,
+        r = use_margins and osc_param.video_margins.r or 0,
+        t = (use_margins and top_vis) and osc_param.video_margins.t or 0,
+        b = (use_margins and bottom_vis) and osc_param.video_margins.b or 0,
+    }
 
     if user_opts.boxvideo then
         -- check whether any margin option has a non-default value
@@ -584,6 +601,24 @@ local function update_margins()
     else
         reset_margins()
     end
+
+    local function get_margin(ent)
+        local margin = 0
+        if user_opts[ent .. "_margins"] then
+            local align = mp.get_property(ent .. "-align-y")
+            if align == "top" and top_vis then
+                margin = margins.t
+            elseif align == "bottom" and bottom_vis then
+                margin = margins.b
+            end
+        end
+        if ent == "sub" and user_opts.boxvideo and mp.get_property_bool("sub-use-margins") then
+            margin = 0
+        end
+        return margin * osc_param.playresy
+    end
+    set_margin_offset("sub-margin-y", get_margin("sub"))
+    set_margin_offset("osd-margin-y", get_margin("osd"))
 
     mp.set_property_native("user-data/osc/margins", margins)
 end
@@ -2241,20 +2276,20 @@ local function osc_init()
     update_margins()
 end
 
-local function set_bar_visible(visible_key, visible, with_margins)
+local function set_bar_visible(visible_key, visible)
     if state[visible_key] ~= visible then
         state[visible_key] = visible
-        if with_margins then update_margins() end
+        update_margins()
     end
     request_tick()
 end
 
 local function osc_visible(visible)
-    set_bar_visible("osc_visible", visible, true)
+    set_bar_visible("osc_visible", visible)
 end
 
 local function set_wc_visible(visible)
-    set_bar_visible("wc_visible", visible, false)
+    set_bar_visible("wc_visible", visible)
 end
 
 local function show_bar(label, showtime_key, visible_key, anitype_key, set_visible)
@@ -2413,8 +2448,16 @@ local function process_event(source, what)
                 )
             ) then
             if window_controls_enabled() and user_opts.windowcontrols_independent then
-                if mouse_in_area("showhide_wc") then show_wc() else hide_wc() end
-                if mouse_in_area("showhide") then show_osc() else hide_osc() end
+                if mouse_in_area("showhide_wc") then
+                    show_wc()
+                elseif user_opts.visibility ~= "always" then
+                    hide_wc()
+                end
+                if mouse_in_area("showhide") then
+                    show_osc()
+                elseif user_opts.visibility ~= "always" then
+                    hide_osc()
+                end
             else
                 show_osc()
                 if window_controls_enabled() then show_wc() end
