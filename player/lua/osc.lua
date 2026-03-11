@@ -25,7 +25,7 @@ local user_opts = {
                                 -- user, but internally negative is "always-on".
     fadeduration = 200,         -- duration of fade out (and fade in, if enabled) in ms, 0 = no fade
     fadein = false,             -- whether to enable fade-in effect
-    deadzonesize = 0.5,         -- size of deadzone
+    deadzonesize = 0.75,        -- size of deadzone
     minmousemove = 0,           -- minimum amount of pixels the mouse has to
                                 -- move between ticks to make the OSC show up
     layout = "bottombar",
@@ -52,6 +52,7 @@ local user_opts = {
     sub_margins = true,         -- adjust sub-margin-y to not overlap with OSC
     osd_margins = true,         -- adjust osd-margin-y to not overlap with OSC
     windowcontrols = "auto",    -- whether to show window controls
+    windowcontrols_fullscreen = false, -- show window controls in fullscreen
     windowcontrols_alignment = "right", -- which side to show window controls on
     windowcontrols_title = "${media-title}", -- same as title but for windowcontrols
     windowcontrols_independent = true, -- show window controls and bottom bar independently
@@ -685,7 +686,10 @@ end
 local function window_controls_enabled()
     local val = user_opts.windowcontrols
     if val == "auto" then
-        return not (state.border and state.title_bar)
+        if state.fullscreen then
+            return user_opts.windowcontrols_fullscreen
+        end
+        return not state.border or not state.title_bar
     else
         return val ~= "no"
     end

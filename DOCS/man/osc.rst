@@ -230,7 +230,7 @@ Configurable Options
     Set to ``no`` to disable any special mouse wheel behavior.
 
 ``deadzonesize``
-    Default: 0.5
+    Default: 0.75
 
     Size of the deadzone. The deadzone is an area that makes the mouse act
     like leaving the window. Movement there won't make the OSC show up and
@@ -239,6 +239,7 @@ Configurable Options
     of the window it will span. Values between 0.0 and 1.0, where 0 means the
     OSC will always popup with mouse movement in the window, and 1 means the
     OSC will only show up when the mouse hovers it. Default pre-0.21.0 was 0.
+    Default pre-0.42.0 was 0.5.
 
 ``minmousemove``
     Default: 0
@@ -430,7 +431,7 @@ Configurable Options
     ``visibility=always`` to take effect.
 
 ``windowcontrols``
-    Default: auto (Show window controls if there is no window border)
+    Default: auto (Show window controls if there is no window border/title-bar)
 
     Whether to show window management controls over the video, and if so,
     which side of the window to place them. This may be desirable when the
@@ -441,6 +442,12 @@ Configurable Options
     The set of window controls is fixed, offering ``minimize``, ``maximize``,
     and ``quit``. Not all platforms implement ``minimize`` and ``maximize``,
     but ``quit`` will always work.
+
+``windowcontrols_fullscreen``
+    Default: no
+
+    Whether to show window controls in fullscreen mode. Only applies when
+    ``windowcontrols`` is set to ``auto``.
 
 ``windowcontrols_independent``
     Default: yes
