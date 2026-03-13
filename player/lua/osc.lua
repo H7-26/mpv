@@ -49,7 +49,7 @@ local user_opts = {
     boxmaxchars = 80,           -- title crop threshold for box layout
     boxvideo = false,           -- apply osc_param.video_margins to video
     dynamic_margins = false,    -- update margins dynamically with OSC visibility
-    sub_margins = true,         -- adjust sub-margin-y to not overlap with OSC
+    sub_margins = false,        -- adjust sub-margin-y to not overlap with OSC
     osd_margins = true,         -- adjust osd-margin-y to not overlap with OSC
     windowcontrols = "auto",    -- whether to show window controls
     windowcontrols_fullscreen = false, -- show window controls in fullscreen
@@ -544,18 +544,6 @@ local function cache_enabled()
     return state.cache_state and #state.cache_state["seekable-ranges"] > 0
 end
 
-local function set_margin_offset(prop, offset)
-    if offset > 0 then
-        if not state[prop] then
-            state[prop] = mp.get_property_number(prop)
-        end
-        mp.set_property_number(prop, state[prop] + offset)
-    elseif state[prop] then
-        mp.set_property_number(prop, state[prop])
-        state[prop] = nil
-    end
-end
-
 local function reset_margins()
     if state.using_video_margins then
         for _, mopt in ipairs(margins_opts) do
@@ -563,8 +551,8 @@ local function reset_margins()
         end
         state.using_video_margins = false
     end
-    set_margin_offset("sub-margin-y", 0)
-    set_margin_offset("osd-margin-y", 0)
+    mp.set_property_number("sub-margin-y-offset", 0)
+    mp.set_property_number("osd-margin-y-offset", 0)
 end
 
 local function update_margins()
@@ -618,8 +606,8 @@ local function update_margins()
         end
         return margin * osc_param.playresy
     end
-    set_margin_offset("sub-margin-y", get_margin("sub"))
-    set_margin_offset("osd-margin-y", get_margin("osd"))
+    mp.set_property_number("sub-margin-y-offset", get_margin("sub"))
+    mp.set_property_number("osd-margin-y-offset", get_margin("osd"))
 
     mp.set_property_native("user-data/osc/margins", margins)
 end
