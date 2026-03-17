@@ -231,7 +231,11 @@ static int get_title_bar_height(struct vo_w32_state *w32)
         DwmGetWindowAttribute(w32->window, DWMWA_VISIBLE_FRAME_BORDER_THICKNESS,
                               &visible_border, sizeof(visible_border));
     }
-    return visible_border;
+    int top_bar = IsMaximized(w32->window)
+                      ? get_system_metrics(w32, SM_CYFRAME) +
+                        get_system_metrics(w32, SM_CXPADDEDBORDER)
+                      : visible_border;
+    return top_bar;
 }
 
 static void add_window_borders(struct vo_w32_state *w32, HWND hwnd, RECT *rc)
@@ -1931,6 +1935,16 @@ set_pos_done:
         } else {
             ShowWindow(w32->window, SW_SHOW);
         }
+
+        // DWMWA_EXTENDED_FRAME_BOUNDS doesn't work when the window was not yet
+        // shown. We need it to correctly account for invisible window borders.
+        // Do one more forced resize after showing the window. This is only
+        // needed for Windows 10, but let's do the same for Windows 11 to get
+        // the same init behavior. In practice, this will only cause small
+        // adjustment to window position based on invisible borders, on
+        // Windows 11 it should be a no-op.
+        w32->pending_reset_size = true;
+        window_resize(w32);
     }
 
 finish:
