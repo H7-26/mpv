@@ -124,6 +124,8 @@ struct vo_w32_state {
     RECT current_rect; // client rect of the window
     RECT windowed_rect; // client rect of the window, when windowed.
 
+    POINT max_track_size;
+
     // video size
     uint32_t o_dwidth;
     uint32_t o_dheight;
@@ -318,26 +320,6 @@ static LRESULT borderless_nchittest(struct vo_w32_state *w32, int x, int y)
     if (x > rc.right)
         return HTRIGHT;
     return HTCLIENT;
-}
-
-// turn a WMSZ_* input value in v into the border that should be resized
-// take into consideration which borders are snapped to avoid detaching
-// returns: 0=left, 1=top, 2=right, 3=bottom, -1=undefined
-static int get_resize_border(struct vo_w32_state *w32, int v)
-{
-    switch (v) {
-    case WMSZ_LEFT:
-    case WMSZ_RIGHT:
-        return w32->snapped_bottom ? 1 : 3;
-    case WMSZ_TOP:
-    case WMSZ_BOTTOM:
-        return w32->snapped_right ? 0 : 2;
-    case WMSZ_TOPLEFT: return 1;
-    case WMSZ_TOPRIGHT: return 1;
-    case WMSZ_BOTTOMLEFT: return 3;
-    case WMSZ_BOTTOMRIGHT: return 3;
-    default: return -1;
-    }
 }
 
 static bool key_state(int vk)
@@ -1264,6 +1246,56 @@ static void update_ime_enabled(struct vo_w32_state *w32, bool enable)
     }
 }
 
+static void handle_sizing(struct vo_w32_state *w32, int edge, RECT *rc)
+{
+    bool drag_l = edge == WMSZ_LEFT || edge == WMSZ_TOPLEFT || edge == WMSZ_BOTTOMLEFT;
+    bool drag_r = edge == WMSZ_RIGHT || edge == WMSZ_TOPRIGHT || edge == WMSZ_BOTTOMRIGHT;
+    bool drag_t = edge == WMSZ_TOP || edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT;
+    bool drag_b = edge == WMSZ_BOTTOM || edge == WMSZ_BOTTOMLEFT || edge == WMSZ_BOTTOMRIGHT;
+
+    // Windows added title-bar docking (drag top edge to the top of working area),
+    // and it seems to send WM_SIZING with edge (wParam) set to 9 when undocking
+    // the window by dragging. This is not documented, and not even an WMSZ_*
+    // value in 10.0.26100.7705 SDK. However, it does restore window size before
+    // docking, so we don't have to do anything here.
+    if (!drag_l && !drag_r && !drag_t && !drag_b)
+        return;
+
+    bool keep_aspect = w32->opts->keepaspect && w32->opts->keepaspect_window;
+    if (!keep_aspect || !w32->o_dwidth || !w32->o_dheight)
+        return;
+
+    RECT wb = {0};
+    add_window_borders(w32, w32->window, &wb);
+    // WM_GETMINMAXINFO should be always sent before any WM_SIZING.
+    mp_assert(w32->max_track_size.x && w32->max_track_size.y);
+    LONG max_w = w32->max_track_size.x - rect_w(wb);
+    LONG max_h = w32->max_track_size.y - rect_h(wb);
+    LONG c_w = rect_w(*rc) - rect_w(wb), c_h = rect_h(*rc) - rect_h(wb);
+    if ((drag_t || drag_b) && !drag_l && !drag_r) {
+        c_w = c_h * w32->o_dwidth / w32->o_dheight;
+        if (c_w > max_w) {
+            c_w = max_w;
+            c_h = c_w * w32->o_dheight / w32->o_dwidth;
+        }
+    } else {
+        c_h = c_w * w32->o_dheight / w32->o_dwidth;
+        if (c_h > max_h) {
+            c_h = max_h;
+            c_w = c_h * w32->o_dwidth / w32->o_dheight;
+        }
+    }
+    LONG w_w = c_w + rect_w(wb), w_h = c_h + rect_h(wb);
+    if (drag_l || (!drag_r && w32->snapped_right))
+        rc->left = rc->right - w_w;
+    else
+        rc->right = rc->left + w_w;
+    if (drag_t || (!drag_b && w32->snapped_bottom))
+        rc->top = rc->bottom - w_h;
+    else
+        rc->bottom = rc->top + w_h;
+}
+
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
                                 LPARAM lParam)
 {
@@ -1407,28 +1439,27 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam,
         update_display_info(w32);
         break;
     }
-    case WM_SIZING:
-        if (w32->opts->keepaspect && w32->opts->keepaspect_window &&
-            !w32->current_fs && !w32->parent && w32->o_dwidth && w32->o_dheight)
-        {
-            RECT *rc = (RECT*)lParam;
-            // get client area of the windows if it had the rect rc
-            // (subtracting the window borders)
-            RECT r = *rc;
-            subtract_window_borders(w32, w32->window, &r);
-            int c_w = rect_w(r), c_h = rect_h(r);
-            double aspect = w32->o_dwidth / (double)w32->o_dheight;
-            int d_w = roundl(c_h * aspect - c_w);
-            int d_h = roundl(c_w / aspect - c_h);
-            int d_corners[4] = { d_w, d_h, -d_w, -d_h };
-            int corners[4] = { rc->left, rc->top, rc->right, rc->bottom };
-            int corner = get_resize_border(w32, wParam);
-            if (corner >= 0)
-                corners[corner] -= d_corners[corner];
-            *rc = (RECT) { corners[0], corners[1], corners[2], corners[3] };
-            return TRUE;
-        }
+    case WM_GETMINMAXINFO: {
+        if (w32->parent)
+            break;
+        // Set the maximum window track size. Default values aka. C{X,Y}MAXTRACK
+        // seems to be too big, making the window go few pixels outside of the
+        // virtual screen edges. Windows calculates them based on virtual screen
+        // size, but doesn't handle borders correctly.
+        MINMAXINFO* mmi = (MINMAXINFO *)lParam;
+        RECT r = {0, 0, get_system_metrics(w32, SM_CXVIRTUALSCREEN),
+                        get_system_metrics(w32, SM_CYVIRTUALSCREEN)};
+        RECT window_rect;
+        if (GetWindowRect(w32->window, &window_rect))
+            adjust_working_area_for_extended_frame(&r, &window_rect, w32->window);
+        mmi->ptMaxTrackSize = w32->max_track_size = (POINT){rect_w(r), rect_h(r)};
         break;
+    }
+    case WM_SIZING:
+        if (w32->parent || w32->current_fs)
+            break;
+        handle_sizing(w32, wParam, (RECT *)lParam);
+        return TRUE;
     case WM_DPICHANGED:
         update_display_info(w32);
 
@@ -1884,6 +1915,13 @@ static void window_resize(struct vo_w32_state *w32)
 
     vo_calc_window_geometry(vo, w32->opts, &screen, &mon, w32->dpi_scale,
                             !w32->window_bounds_initialized, &geo, &size_constraint);
+    // Limit the minimum window size to prevent the window floating to different
+    // position when our requested size is smaller than the system minimum.
+    // C{X,Y}MIN values doesn't seem to be absolute minimum of window, but it's
+    // the reasonable size.
+    POINT min = {get_system_metrics(w32, SM_CXMIN), get_system_metrics(w32, SM_CYMIN)};
+    geo.win.x1 = MPMAX(geo.win.x0 + min.x, geo.win.x1);
+    geo.win.y1 = MPMAX(geo.win.y0 + min.y, geo.win.y1);
     vo_apply_window_geometry(vo, &geo);
 
     w32->pending_reset_size |= w32->opts->auto_window_resize &&
