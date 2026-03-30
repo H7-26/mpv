@@ -4377,9 +4377,9 @@ Demuxer
     ``--shuffle``, and like ``lazy`` otherwise.
 
 ``--directory-filter-types=<video,audio,image,archive,playlist>``
-    Media file types to filter when opening directory. If the list is empty,
-    all files are added to the playlist. (Default:
-    ``video,audio,image,archive,playlist``)
+    Media file types to filter when opening directory. To have all files added
+    to the playlist, clear the list using ``--directory-filter-types-clr``.
+    (Default: ``video,audio,image,archive,playlist``)
 
     This is a string list option. See `List Options`_ for details.
 
@@ -6335,12 +6335,13 @@ them.
 
 ``--wayland-edge-pixels-pointer=<value>``
     Defines the size of an edge border (default: 16) to initiate client side
-    resize events in the wayland contexts with the mouse. This is only active if
-    there are no server side decorations from the compositor.
+    resize events in the wayland contexts with the mouse or tablet. This is only
+    active if there are no server side decorations from the compositor.
 
 ``--wayland-edge-pixels-touch=<value>``
     Defines the size of an edge border (default: 32) to initiate client side
-    resizes events in the wayland contexts with touch events.
+    resizes events in the wayland contexts with touch events. This is only
+    active if there are no server side decorations from the compositor.
 
 ``--wayland-internal-vsync=<no|auto|yes>``
     Controls whether to use mpv's internal vsync for Wayland-base video outputs
