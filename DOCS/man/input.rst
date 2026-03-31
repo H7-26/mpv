@@ -2236,6 +2236,10 @@ Property list
     .. note:: This is only an estimate. (It's computed from two unreliable
               quantities: fps and possibly rounded timestamps.)
 
+``env``
+    Read-only table of all the environment variables. A specific variable can be
+    accessed as a sub-property, e.g. ``${env/HOME}`` returns ``$HOME`` if set.
+
 ``pid``
     Process-id of mpv.
 
@@ -3639,6 +3643,8 @@ Property list
 
     If tracks of the requested type are selected via ``--lavfi-complex``, the
     first one is returned.
+
+    Note that this property cannot be used directly, a sub-property is required.
 
 ``chapter-list`` (RW)
     List of chapters, current entry marked.
