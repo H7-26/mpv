@@ -852,13 +852,6 @@ static int mp_property_percent_pos(void *ctx, struct m_property *prop,
     return M_PROPERTY_NOT_IMPLEMENTED;
 }
 
-static int mp_property_time_start(void *ctx, struct m_property *prop,
-                                  int action, void *arg)
-{
-    // minor backwards-compat.
-    return property_time(action, arg, 0);
-}
-
 /// Current position in seconds (RW)
 static int mp_property_time_pos(void *ctx, struct m_property *prop,
                                 int action, void *arg)
@@ -4456,7 +4449,6 @@ static const struct m_property mp_properties_base[] = {
     {"frame-drop-count", mp_property_frame_drop_vo},
     {"vo-delayed-frame-count", mp_property_vo_delayed_frame_count},
     {"percent-pos", mp_property_percent_pos},
-    {"time-start", mp_property_time_start},
     {"time-pos", mp_property_time_pos},
     {"time-remaining", mp_property_remaining},
     {"audio-pts", mp_property_audio_pts},
@@ -7211,7 +7203,7 @@ static void cmd_update_clipboard(void *p)
 {
     struct mp_cmd_ctx *cmd = p;
     struct MPContext *mpctx = cmd->mpctx;
-    struct clipboard_access_params params = {.type = cmd->args[0].v.i};
+    struct clipboard_access_params params = {.target = cmd->args[0].v.i};
     double timeout = cmd->args[1].v.i / 1000.0;
     bool success = false;
 
