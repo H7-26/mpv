@@ -3267,6 +3267,44 @@ static int mp_property_tablet_pos(void *ctx, struct m_property *prop,
     return M_PROPERTY_NOT_IMPLEMENTED;
 }
 
+static int mp_property_dropped_files(void *ctx, struct m_property *prop,
+                                     int action, void *arg)
+{
+    MPContext *mpctx = ctx;
+
+    int valid = m_property_read_sub_validate(ctx, prop, action, arg);
+    if (valid != M_PROPERTY_VALID)
+        return valid;
+
+    int64_t dnd_ts;
+    enum mp_dnd_action dnd_action;
+    char **dropped_files;
+    void *talloc_ctx = talloc_new(NULL);
+    mp_input_get_dropped_files(mpctx->input, talloc_ctx, &dnd_ts,
+                               &dnd_action, &dropped_files);
+    int r = M_PROPERTY_UNAVAILABLE;
+    if (dnd_action == DND_NONE)
+        goto done;
+
+    char *actionstr = dnd_action == DND_REPLACE ? "replace" :
+                      dnd_action == DND_APPEND ? "append" :
+                      dnd_action == DND_INSERT_NEXT ? "insert-next" :
+                      "none";
+
+    struct m_sub_property props[] = {
+        {"time",   SUB_PROP_INT64(dnd_ts)},
+        {"action", SUB_PROP_STR(actionstr)},
+        {"files",  SUB_PROP_STRING_LIST(dropped_files)},
+        {0}
+    };
+
+    r = m_property_read_sub(props, action, arg);
+
+done:
+    talloc_free(talloc_ctx);
+    return r;
+}
+
 /// Video fps (RO)
 static int mp_property_fps(void *ctx, struct m_property *prop,
                            int action, void *arg)
@@ -4054,8 +4092,8 @@ static int mp_property_option_info(void *ctx, struct m_property *prop,
              .unavailable = !(has_minmax && opt->min != DBL_MIN)},
             {"max",                     SUB_PROP_DOUBLE(opt->max),
              .unavailable = !(has_minmax && opt->max != DBL_MAX)},
-            {"choices", .type = {.type = CONF_TYPE_STRING_LIST},
-             .value = {.string_list = choices}, .unavailable = !choices},
+            {"choices",                 SUB_PROP_STRING_LIST(choices),
+             .unavailable = !choices},
             {0}
         };
 
@@ -4666,6 +4704,7 @@ static const struct m_property mp_properties_base[] = {
     {"mouse-pos", mp_property_mouse_pos},
     {"touch-pos", mp_property_touch_pos},
     {"tablet-pos", mp_property_tablet_pos},
+    {"dropped-files", mp_property_dropped_files},
 
     // Subs
     {"sid", mp_property_switch_track, .priv = (void *)(const int[]){0, STREAM_SUB}},
@@ -4810,7 +4849,7 @@ static const char *const *const mp_event_property_change[] = {
     E(MP_EVENT_CHANGE_PLAYLIST, "playlist", "playlist-pos", "playlist-pos-1",
       "playlist-count", "playlist/count", "playlist-current-pos",
       "playlist-playing-pos"),
-    E(MP_EVENT_INPUT_PROCESSED, "mouse-pos", "touch-pos", "tablet-pos"),
+    E(MP_EVENT_INPUT_PROCESSED, "mouse-pos", "touch-pos", "tablet-pos", "dropped-files"),
     E(MP_EVENT_CORE_IDLE, "core-idle", "eof-reached"),
 };
 #undef E
@@ -8197,9 +8236,6 @@ void mp_option_run_callback(struct MPContext *mpctx, struct mp_option_callback *
 
     if (flags & UPDATE_CLIPBOARD)
         reinit_clipboard(mpctx);
-
-    if (flags & UPDATE_SUB_EXTS)
-        mp_update_subtitle_exts(mpctx->opts);
 
     if (opt_ptr == &opts->ipc_path || opt_ptr == &opts->ipc_client) {
         mp_uninit_ipc(mpctx->ipc_ctx);
