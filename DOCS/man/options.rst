@@ -120,6 +120,25 @@ Track Selection
     to ``auto`` (the default), mpv will choose the first edition declared as a
     default, or if there is no default, the first edition defined.
 
+``--flatten-editions=<yes|no>``
+    Some container formats (such as HLS or MPEG-TS with multiple programs)
+    expose multiple programs or rendition groups. By default, mpv respects the
+    format and groups tracks into editions, filtering the track list to only
+    show tracks belonging to the currently selected edition.
+
+    Setting this option to ``yes`` ignores the program structure of the file.
+    No editions are created, and all tracks from all programs are shown as a
+    flat list. Note that depending on the file, tracks from different programs
+    may be completely unrelated to each other.
+
+``--show-dependent-tracks=<yes|no>``
+    Show dependent tracks in the track list (default: no). Dependent tracks
+    carry coded data that is not independently decodable. For example, the
+    tile sub-streams that make up a tiled HEIF image, the raw coded layers of
+    an IAMF audio element, or the enhancement stream in an LCEVC group. They
+    are hidden by default because exposing them would clutter the track list
+    with entries that cannot be meaningfully selected on their own.
+
 ``--track-auto-selection=<yes|no>``
     Enable the default track auto-selection (default: yes). Enabling this will
     make the player select streams according to ``--aid``, ``--alang``, and
