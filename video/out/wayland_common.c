@@ -1934,6 +1934,8 @@ resize:
                    mp_rect_w(old_geometry), mp_rect_h(old_geometry),
                    mp_rect_w(wl->geometry), mp_rect_h(wl->geometry));
         wl->pending_vo_events |= VO_EVENT_RESIZE;
+    } else if (wl->resizing) {
+        wl->pending_vo_events |= VO_EVENT_EXPOSE;
     }
 
     wl->override_surface_local = width == 0 || height == 0 || wl->reconfigured;
@@ -3019,9 +3021,9 @@ static void apply_keepaspect(struct vo_wayland_state *wl, int *width, int *heigh
     }
 
     double scale_factor = (double)*width / wl->reduced_width;
-    *width = ceil(wl->reduced_width * scale_factor);
+    *width = lrint(wl->reduced_width * scale_factor);
     if (wl->opts->keepaspect_window)
-        *height = ceil(wl->reduced_height * scale_factor);
+        *height = lrint(wl->reduced_height * scale_factor);
 
     if (wl->resizing_constraint == MP_HEIGHT_CONSTRAINT) {
         MPSWAP(int, *width, *height);
