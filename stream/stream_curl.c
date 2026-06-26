@@ -84,14 +84,6 @@ struct curl_opts {
     int64_t max_request_size;
 };
 
-#ifndef CURL_HTTP_VERSION_3
-#define CURL_HTTP_VERSION_3 CURL_HTTP_VERSION_NONE
-#endif
-
-#ifndef CURL_HTTP_VERSION_3ONLY
-#define CURL_HTTP_VERSION_3ONLY CURL_HTTP_VERSION_NONE
-#endif
-
 // Older lavf has a bug with nested IO cleanup, so don't enable curl by default.
 // <https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/23082>
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(62, 15, 101)
@@ -956,8 +948,9 @@ static int curl_open(stream_t *s, const struct stream_open_args *args)
 
     char *content_type = NULL;
     curl_easy_getinfo(p->curl, CURLINFO_CONTENT_TYPE, &content_type);
-    if (content_type && content_type[0])
-        s->mime_type = talloc_strdup(s, content_type);
+    bstr mime = bstr_strip(bstr_split(bstr0(content_type), ";", NULL));
+    if (mime.len)
+        s->mime_type = bstrto0(s, mime);
 
     const char *effective_url = NULL;
     curl_easy_getinfo(p->curl, CURLINFO_EFFECTIVE_URL, &effective_url);
@@ -971,6 +964,7 @@ static int curl_open(stream_t *s, const struct stream_open_args *args)
     s->seek = p->seekable ? curl_seek : NULL;
     s->get_size = curl_get_size;
     s->close = curl_close;
+    s->pos = p->request_start;
 
     return STREAM_OK;
 }
@@ -1180,6 +1174,7 @@ int mp_curl_avio_open(struct demuxer *demuxer, AVIOContext **pb_out,
     }
     pb->seekable = s->seekable ? AVIO_SEEKABLE_NORMAL : 0;
     pb->av_class = &curl_avio_class;
+    pb->pos = oa.offset;
 
     *pb_out = pb;
     *cookie_out = c;
