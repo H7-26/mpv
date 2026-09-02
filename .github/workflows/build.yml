@@ -730,7 +730,7 @@ jobs:
     name: Publish git release
     needs: [mingw, win32, macos]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' &&
-        github.repository == 'mpv-player/mpv'
+        github.repository == 'H7-26/mpv'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -819,16 +819,16 @@ jobs:
             done
             gh release edit "$tag" \
               --prerelease \
-              --latest=false \
-              --title "mpv development build" \
+              --latest=true \
+              --title "mpv dev build" \
               --notes "$notes"
             gh release upload "$tag" release/*
           else
             gh release create "$tag" \
               --target "$GITHUB_SHA" \
               --prerelease \
-              --latest=false \
-              --title "mpv development build" \
+              --latest=true \
+              --title "mpv develop build" \
               --notes "$notes" \
               release/*
           fi
